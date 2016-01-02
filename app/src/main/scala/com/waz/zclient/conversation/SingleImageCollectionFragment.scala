@@ -19,18 +19,19 @@ package com.waz.zclient.conversation
 
 import android.os.Bundle
 import android.view.GestureDetector.SimpleOnGestureListener
-import android.view.View.{OnClickListener, OnLayoutChangeListener, OnTouchListener}
+import android.view.View.{OnLayoutChangeListener, OnLongClickListener, OnTouchListener}
 import android.view._
 import com.waz.model.{AssetData, AssetId}
 import com.waz.service.ZMessaging
 import com.waz.service.assets.AssetService.BitmapResult
 import com.waz.service.assets.AssetService.BitmapResult.BitmapLoaded
 import com.waz.service.images.BitmapSignal
+import com.waz.service.messages.MessageAndLikes
 import com.waz.threading.Threading
 import com.waz.ui.MemoryImageCache.BitmapRequest.Single
 import com.waz.utils.events.Signal
+import com.waz.zclient.messages.controllers.MessageActionsController
 import com.waz.zclient.pages.BaseFragment
-import com.waz.zclient.ui.text.GlyphTextView
 import com.waz.zclient.utils.ViewUtils
 import com.waz.zclient.views.images.TouchImageView
 import com.waz.zclient.{FragmentHelper, OnBackPressedListener, R}
@@ -41,20 +42,24 @@ class SingleImageCollectionFragment extends BaseFragment[CollectionFragment.Cont
 
   lazy val zms = inject[Signal[ZMessaging]]
   lazy val assetsStorage = zms.map(_.assetsStorage)
+  lazy val messageActions = inject[MessageActionsController]
+
+  lazy val messageAndLikes = zms.zip(collectionController.focusedItem).flatMap{
+    case (z, Some(md)) => Signal.future(z.msgAndLikes.combineWithLikes(md))
+    case _ => Signal[MessageAndLikes]()
+  }
 
   override def onCreateView(inflater: LayoutInflater, container: ViewGroup, savedInstanceState: Bundle): View = {
     val view = inflater.inflate(R.layout.fragment_single_image_collections, container, false)
-    val shareButton: GlyphTextView = ViewUtils.getView(view, R.id.gtv__share_button)
     val imageView: TouchImageView = ViewUtils.getView(view, R.id.tiv__image_view)
-    shareButton.setOnClickListener(new OnClickListener {
-      override def onClick(v: View): Unit = {
-        collectionController.focusedItem.currentValue match {
-          case Some(Some(messageData)) => collectionController.openShareCollectionItem(messageData)
-          case _ =>
-        }
+    messageAndLikes.disableAutowiring()
+    imageView.setOnLongClickListener(new OnLongClickListener {
+      override def onLongClick(v: View): Boolean = {
+        getView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        messageAndLikes.currentValue.exists(messageActions.showDialog)
+        true
       }
     })
-
     val gestureDetector = new GestureDetector(getContext, new SimpleOnGestureListener(){
       override def onFling(e1: MotionEvent, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean = {
         if (imageView.isZoomed) return true

@@ -22,67 +22,122 @@ import android.content.{Context, DialogInterface}
 import android.database.DataSetObserver
 import android.net.Uri
 import android.os.Bundle
+import android.support.v4.app.DialogFragment
 import android.support.v7.app.AlertDialog
-import android.text.TextUtils
+import android.support.v7.widget.Toolbar
 import android.text.format.Formatter
 import android.util.AttributeSet
-import android.view.{LayoutInflater, View, ViewGroup}
 import android.view.View.OnClickListener
+import android.view._
 import android.widget._
 import com.waz.api.ConversationsList.ConversationsListState
 import com.waz.api._
-import com.waz.model.{AssetId, AssetType}
+import com.waz.model.{AssetData, AssetType, MessageData, MessageId}
 import com.waz.threading.Threading
+import com.waz.utils.events.{Signal, SourceSignal}
 import com.waz.zclient.controllers.AssetsController
+import com.waz.zclient.controllers.global.AccentColorController
 import com.waz.zclient.core.stores.conversation.{ConversationChangeRequester, ConversationStoreObserver}
-import com.waz.zclient.pages.BaseFragment
-import com.waz.zclient.ui.text.{GlyphTextView, TypefaceTextView}
+import com.waz.zclient.messages.MessagesController
+import com.waz.zclient.pages.BaseDialogFragment
+import com.waz.zclient.ui.text.TypefaceTextView
+import com.waz.zclient.ui.views.CursorIconButton
 import com.waz.zclient.utils.ViewUtils
 import com.waz.zclient.{FragmentHelper, OnBackPressedListener, R}
 
 
-class CollectionShareFragment extends BaseFragment[CollectionFragment.Container] with FragmentHelper with OnBackPressedListener {
+class ShareToMultipleFragment extends BaseDialogFragment[ShareToMultipleFragment.Container] with FragmentHelper with OnBackPressedListener {
 
   lazy val assetsController = inject[AssetsController]
+  lazy val messagesController = inject[MessagesController]
+  lazy val accentColorController = inject[AccentColorController]
 
   override def onCreateView(inflater: LayoutInflater, container: ViewGroup, savedInstanceState: Bundle): View = {
     val view = inflater.inflate(R.layout.fragment_collection_share, container, false)
     val listView = ViewUtils.getView(view, R.id.lv__conversation_list).asInstanceOf[ListView]
-    val sendButton = ViewUtils.getView(view, R.id.gtv__share_button).asInstanceOf[GlyphTextView]
-    val adapter = new CollectionShareConversationAdapter(getContext)
+    val sendButton = ViewUtils.getView(view, R.id.cib__send_button).asInstanceOf[CursorIconButton]
+    val adapter = new ShareToMultipleAdapter(getContext)
+    val toolbar = ViewUtils.getView(view, R.id.t_toolbar).asInstanceOf[Toolbar]
+    val messageId = getArguments.getString(ShareToMultipleFragment.MSG_ID_ARG)
+    val messageData = messagesController.getMessage(MessageId(messageId)).flatMap{
+      case Some(md) => Signal(md)
+      case _ => Signal[MessageData]()
+    }
+    val assetDataSignal: SourceSignal[Option[AssetData]] = Signal[Option[AssetData]]()
+    val messageTextSignal: SourceSignal[Option[String]] = Signal[Option[String]]()
+    val clickSignal: SourceSignal[Unit] = Signal[Unit]()
+
+    accentColorController.accentColor.on(Threading.Ui) {
+      color => sendButton.setSolidBackgroundColor(color.getColor())
+    }
+
+    toolbar.setNavigationIcon(if (getControllerFactory.getThemeController.isDarkTheme) R.drawable.ic_action_close_light else R.drawable.ic_action_close_dark)
+    toolbar.setNavigationOnClickListener(new OnClickListener {
+      override def onClick(v: View): Unit = onBackPressed()
+    })
+
     listView.setAdapter(adapter)
     getStoreFactory.getConversationStore.addConversationStoreObserverAndUpdate(adapter)
 
-    val assetId = getArguments.getString(CollectionShareFragment.ASSET_ARG)
-    val messageContent = getArguments.getString(CollectionShareFragment.TEXT_ARG)
+    sendButton.setVisibility(View.GONE)
+    messageData.on(Threading.Ui) {
+      _ => sendButton.setVisibility(View.VISIBLE)
+    }
+
+    messageData.on(Threading.Background)(md => md.msgType match {
+      case Message.Type.ANY_ASSET | Message.Type.ASSET | Message.Type.VIDEO_ASSET | Message.Type.AUDIO_ASSET =>
+        assetDataSignal ! None
+        messageTextSignal ! None
+        assetsController.assetSignal(md.assetId).on(Threading.Background)(a => assetDataSignal ! Some(a._1))
+      case _ =>
+        messageTextSignal ! Some(md.contentString)
+        assetDataSignal ! None
+    })
+
+    val dialog = new ProgressDialog(getContext)
+    dialog.setTitle(getString(R.string.conversation__action_mode__fwd__dialog__title))
+    dialog.setMessage(getString(R.string.conversation__action_mode__fwd__dialog__message))
+    dialog.setIndeterminate(true)
+    dialog.setCancelable(true)
+    dialog.setOnCancelListener(null)
+
+    (for{
+      ad <- assetDataSignal
+      mt <- messageTextSignal
+      _ <- clickSignal
+    } yield (ad, mt)).on(Threading.Ui) {
+      case (None, None) =>
+        dialog.show()
+      case (None, Some(text)) =>
+        if (dialog.isShowing) dialog.dismiss()
+        sendMessage(text, adapter.selectedConversations.toSet)
+        onBackPressed()
+      case (Some(assetData), _) =>
+        if (dialog.isShowing) dialog.dismiss()
+        (assetData.assetType, assetData.source) match {
+          case (Some(AssetType.Image), Some(uri)) =>
+            sendImageAsset(uri, adapter.selectedConversations.toSet)
+          case (_, Some(uri)) =>
+            sendAsset(uri, adapter.selectedConversations.toSet)
+          case _ =>
+        }
+        onBackPressed()
+    }
 
     sendButton.setOnClickListener(new OnClickListener {
       override def onClick(v: View): Unit = {
         if (adapter.selectedConversations.isEmpty) {
           return
         }
-        if (!TextUtils.isEmpty(assetId)) {
-          val dialog = ProgressDialog.show(getContext,
-            getString(R.string.conversation__action_mode__fwd__dialog__title),
-            getString(R.string.conversation__action_mode__fwd__dialog__message), true, true, null)
-          assetsController.assetSignal(AssetId(assetId)).map(asset => (asset._1.assetType, asset._1.source)).on(Threading.Ui){
-            case (Some(AssetType.Image), Some(uri)) =>
-              dialog.dismiss()
-              sendImageAsset(uri, adapter.selectedConversations.toSet)
-              getControllerFactory.getCollectionsController.closeShareCollectionItem()
-            case (Some(_), Some(uri)) =>
-              dialog.dismiss()
-              sendAsset(uri, adapter.selectedConversations.toSet)
-              getControllerFactory.getCollectionsController.closeShareCollectionItem()
-            case _ => dialog.dismiss()
-          }
-        } else if (!TextUtils.isEmpty(messageContent)) {
-          sendMessage(messageContent, adapter.selectedConversations.toSet)
-          getControllerFactory.getCollectionsController.closeShareCollectionItem()
-        }
+        clickSignal ! (())
       }
     })
     view
+  }
+
+  override def onCreate(savedInstanceState: Bundle): Unit = {
+    super.onCreate(savedInstanceState)
+    setStyle(DialogFragment.STYLE_NO_FRAME, R.style.Theme_Dark_Preferences)
   }
 
   //TODO this was copied from ConversationFragment...
@@ -131,12 +186,12 @@ class CollectionShareFragment extends BaseFragment[CollectionFragment.Container]
   }
 
   override def onBackPressed(): Boolean = {
-    getControllerFactory.getCollectionsController.closeShareCollectionItem()
+    getDialog.dismiss()
     true
   }
 }
 
-class CollectionShareConversationAdapter(context: Context) extends ListAdapter with ConversationStoreObserver{
+class ShareToMultipleAdapter(context: Context) extends ListAdapter with ConversationStoreObserver{
 
   var conversationsList: Option[ConversationsList] = None
   val selectedConversations = new scala.collection.mutable.HashSet[IConversation]
@@ -214,25 +269,18 @@ class SelectableConversationRow(context: Context, attrs: AttributeSet, defStyleA
   }
 }
 
-object CollectionShareFragment {
-  val TAG = CollectionShareFragment.getClass.getSimpleName
+object ShareToMultipleFragment {
+  val TAG = ShareToMultipleFragment.getClass.getSimpleName
 
-  val ASSET_ARG = "ASSET_ARG"
-  val TEXT_ARG = "TEXT_ARG"
+  val MSG_ID_ARG = "MSG_ID_ARG"
 
-  def newInstance(assetId: AssetId): CollectionShareFragment = {
-    val fragment = new CollectionShareFragment
+  def newInstance(messageId: MessageId): ShareToMultipleFragment = {
+    val fragment = new ShareToMultipleFragment
     val bundle = new Bundle()
-    bundle.putString(ASSET_ARG, assetId.str)
+    bundle.putString(MSG_ID_ARG, messageId.str)
     fragment.setArguments(bundle)
     fragment
   }
 
-  def newInstance(messageContent: String): CollectionShareFragment ={
-    val fragment = new CollectionShareFragment
-    val bundle = new Bundle()
-    bundle.putString(TEXT_ARG, messageContent)
-    fragment.setArguments(bundle)
-    fragment
-  }
+  trait Container
 }

@@ -21,15 +21,18 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:orientation="horizontal"
               android:layout_width="match_parent"
-              android:layout_height="wrap_content"
-              android:padding="@dimen/wire__padding__12">
+              android:layout_height="@dimen/list_row_height"
+              android:paddingTop="@dimen/list_tile_top_padding"
+              android:paddingBottom="@dimen/list_tile_bottom_padding"
+              android:paddingLeft="@dimen/wire__padding__12"
+              android:paddingRight="@dimen/wire__padding__12">
 
     <android.support.v7.widget.AppCompatCheckBox
         android:id="@+id/rb__conversation_selected"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_vertical"
-        android:buttonTint="@color/white"
+        android:buttonTint="?wirePrimaryTextColor"
         />
 
     <com.waz.zclient.ui.text.TypefaceTextView
@@ -38,5 +41,8 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center_vertical"
         android:paddingLeft="@dimen/wire__padding__12"
-        android:textColor="@color/white"/>
+        android:textColor="?wirePrimaryTextColor"
+        android:fontFamily="sans-serif-light"
+        android:textSize="@dimen/list_font_size"/>
+
 </LinearLayout>

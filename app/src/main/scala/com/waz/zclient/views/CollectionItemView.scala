@@ -18,32 +18,56 @@
 package com.waz.zclient.views
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.support.v7.widget.RecyclerView
 import android.util.AttributeSet
-import android.view.LayoutInflater
+import android.view.View.OnClickListener
+import android.view.{HapticFeedbackConstants, LayoutInflater}
 import android.widget.{FrameLayout, LinearLayout, TextView}
-import com.waz.model.{ConversationData, MessageContent, MessageData}
+import com.waz.bitmap.BitmapUtils
+import com.waz.model.{AssetData, ConversationData, MessageContent, MessageData}
 import com.waz.service.ZMessaging
+import com.waz.service.assets.AssetService.BitmapResult
+import com.waz.service.assets.AssetService.BitmapResult.BitmapLoaded
+import com.waz.service.images.BitmapSignal
+import com.waz.service.messages.MessageAndLikes
 import com.waz.threading.Threading
+import com.waz.ui.MemoryImageCache.BitmapRequest.Single
 import com.waz.utils.events.{EventContext, Signal, SourceSignal}
 import com.waz.zclient.messages.MessageView.MsgBindOptions
 import com.waz.zclient.messages.MessageViewPart
-import com.waz.zclient.utils.ViewUtils
+import com.waz.zclient.messages.controllers.MessageActionsController
+import com.waz.zclient.pages.main.conversation.views.AspectRatioImageView
+import com.waz.zclient.utils.{ViewUtils, _}
 import com.waz.zclient.{R, ViewHelper}
 import org.threeten.bp.{LocalDateTime, ZoneId}
 
-class CollectionItemView(context: Context, attrs: AttributeSet, style: Int) extends LinearLayout(context, attrs, style) with ViewHelper {
+trait CollectionItemView extends ViewHelper {
+  protected lazy val zms = inject[Signal[ZMessaging]]
+  protected lazy val messageActions = inject[MessageActionsController]
+  val messageData: SourceSignal[MessageData] = Signal()
+
+  val messageAndLikes = zms.zip(messageData).flatMap{
+    case (z, md) => Signal.future(z.msgAndLikes.combineWithLikes(md))
+    case _ => Signal[MessageAndLikes]()
+  }
+  messageAndLikes.disableAutowiring()
+
+  this.onLongClick {
+    performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+    messageAndLikes.currentValue.exists(messageActions.showDialog)
+  }
+}
+
+class CollectionNormalItemView(context: Context, attrs: AttributeSet, style: Int) extends LinearLayout(context, attrs, style) with CollectionItemView {
   def this(context: Context, attrs: AttributeSet) = this(context, attrs, 0)
   def this(context: Context) = this(context, null, 0)
 
-  val zms = inject[Signal[ZMessaging]]
   inflate(R.layout.row_collection_item_view)
 
   val container: FrameLayout = ViewUtils.getView(this, R.id.fl__collections__content_layout)
   val messageTime: TextView = ViewUtils.getView(this, R.id.ttv__collection_item__time)
   val messageUser: TextView = ViewUtils.getView(this, R.id.ttv__collection_item__user_name)
-
-  val messageData: SourceSignal[MessageData] = Signal()
 
   messageData.flatMap(msg => zms.map(_.usersStorage).flatMap(_.signal(msg.userId))).on(Threading.Ui) {
     user => messageUser.setText(user.name)
@@ -59,18 +83,56 @@ class CollectionItemView(context: Context, attrs: AttributeSet, style: Int) exte
     this.messageData ! messageData
     val messageViewPart = container.getChildAt(0).asInstanceOf[MessageViewPart]
     if (messageViewPart != null) {
-      messageViewPart.set(messageData, content, CollectionItemView.DefaultBindingOptions) }
+      messageViewPart.set(messageData, content, CollectionNormalItemView.DefaultBindingOptions)
+    }
   }
 }
 
-object CollectionItemView{
-  val DefaultBindingOptions = MsgBindOptions(0, false, false, false, false, 0, ConversationData.ConversationType.Unknown)
+object CollectionNormalItemView{
+  val DefaultBindingOptions = MsgBindOptions(0, isSelf = false, isLast = false, isLastSelf = false, isFirstUnread = false, 0, ConversationData.ConversationType.Unknown)
 }
 
-abstract class CollectionItemViewHolder(view: CollectionItemView)(implicit eventContext: EventContext) extends RecyclerView.ViewHolder(view){
+class CollectionImageView(context: Context) extends AspectRatioImageView(context) with CollectionItemView{
+  val width = Signal[Int]()
+
+  messageData.zip(width).flatMap{
+    case (msg, w) =>
+      zms.flatMap { zms =>
+        zms.assetsStorage.signal(msg.assetId).flatMap {
+          case data@AssetData.IsImage() => BitmapSignal(data, Single(w), zms.imageLoader, zms.imageCache)
+          case _ => Signal.empty[BitmapResult]
+        }.map{
+          case BitmapLoaded(bmp, _) => Option(BitmapUtils.cropRect(bmp, w))
+          case _ => None
+        }
+      }
+    case _ => Signal[Option[Bitmap]](None)
+  }.on(Threading.Ui) {
+    case Some(b) => setImageBitmap(b)
+    case _ =>
+  }
+
+  def setMessageData(messageData: MessageData, width: Int, color: Int) = {
+    setAspectRatio(1)
+    ViewUtils.setWidth(this, width)
+    ViewUtils.setHeight(this, width)
+    if (this.messageData.currentValue.exists(_.assetId != messageData.assetId) || this.width.currentValue.exists(_ != width)) {
+      setImageBitmap(null)
+      setBackgroundColor(color)
+      setAlpha(0f)
+      animate
+        .alpha(1f)
+        .setDuration(context.getResources.getInteger(R.integer.content__image__directly_final_duration))
+        .start()
+    }
+    this.width ! width
+    this.messageData ! messageData
+  }
+}
+
+abstract class CollectionItemViewHolder(view: CollectionNormalItemView)(implicit eventContext: EventContext) extends RecyclerView.ViewHolder(view){
 
   def setMessageData(messageData: MessageData, content: Option[MessageContent]): Unit = {
-    view.setTag(messageData)
     view.setMessageData(messageData, content)
   }
 
@@ -79,13 +141,21 @@ abstract class CollectionItemViewHolder(view: CollectionItemView)(implicit event
   }
 }
 
-case class FileViewHolder(view: CollectionItemView)(implicit eventContext: EventContext) extends CollectionItemViewHolder(view)
+case class FileViewHolder(view: CollectionNormalItemView)(implicit eventContext: EventContext) extends CollectionItemViewHolder(view)
 
-case class LinkPreviewViewHolder(view: CollectionItemView)(implicit eventContext: EventContext) extends CollectionItemViewHolder(view) {
+case class LinkPreviewViewHolder(view: CollectionNormalItemView)(implicit eventContext: EventContext) extends CollectionItemViewHolder(view) {
   override def setMessageData(messageData: MessageData): Unit = {
     val content = messageData.content.find(_.openGraph.nonEmpty)
     setMessageData(messageData, content)
   }
 }
 
-case class SimpleLinkViewHolder(view: CollectionItemView)(implicit eventContext: EventContext) extends CollectionItemViewHolder(view)
+case class SimpleLinkViewHolder(view: CollectionNormalItemView)(implicit eventContext: EventContext) extends CollectionItemViewHolder(view)
+
+case class CollectionImageViewHolder(view: CollectionImageView, listener: OnClickListener)(implicit eventContext: EventContext) extends RecyclerView.ViewHolder(view) {
+  view.setOnClickListener(listener)
+
+  def setMessageData(messageData: MessageData, width: Int, color: Int) = {
+    view.setMessageData(messageData, width, color)
+  }
+}

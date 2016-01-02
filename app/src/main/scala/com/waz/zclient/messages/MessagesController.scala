@@ -102,4 +102,8 @@ class MessagesController()(implicit injector: Injector, ev: EventContext) extend
     case _ =>
       // messages list is not visible, or not current conv, ignoring
   }
+
+  def getMessage(messageId: MessageId): Signal[Option[MessageData]] = {
+    zms.flatMap(z => Signal.future(z.messagesStorage.get(messageId)))
+  }
 }

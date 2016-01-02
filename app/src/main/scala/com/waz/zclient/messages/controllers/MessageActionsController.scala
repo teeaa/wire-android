@@ -21,7 +21,7 @@ import android.app.{Activity, ProgressDialog}
 import android.content.DialogInterface.OnDismissListener
 import android.content.{ClipData, ClipboardManager, Context, DialogInterface}
 import android.net.Uri
-import android.support.v4.app.ShareCompat
+import android.support.v4.app.{FragmentManager, ShareCompat}
 import android.support.v7.app.AlertDialog
 import android.widget.Toast
 import com.waz.ZLog.ImplicitTag._
@@ -35,6 +35,7 @@ import com.waz.utils.events.{EventContext, EventStream, Signal}
 import com.waz.zclient.common.controllers.{PermissionsController, WriteExternalStoragePermission}
 import com.waz.zclient.controllers.global.KeyboardController
 import com.waz.zclient.controllers.userpreferences.IUserPreferencesController
+import com.waz.zclient.conversation.ShareToMultipleFragment
 import com.waz.zclient.notifications.controllers.ImageNotificationsController
 import com.waz.zclient.pages.main.conversation.controller.IConversationScreenController
 import com.waz.zclient.pages.main.conversation.views.MessageBottomSheetDialog
@@ -54,6 +55,7 @@ class MessageActionsController(implicit injector: Injector, ctx: Context, ec: Ev
   private lazy val clipboardManager     = inject[ClipboardManager]
   private lazy val permissions          = inject[PermissionsController]
   private lazy val imageNotifications   = inject[ImageNotificationsController]
+  private lazy val fragmentManager      = inject[FragmentManager]
 
   private val zms = inject[Signal[ZMessaging]]
 
@@ -69,13 +71,14 @@ class MessageActionsController(implicit injector: Injector, ctx: Context, ec: Ev
   }
 
   onMessageAction {
-    case (MessageAction.COPY, message)          => copyMessage(message)
-    case (MessageAction.DELETE_GLOBAL, message) => recallMessage(message)
-    case (MessageAction.DELETE_LOCAL, message)  => deleteMessage(message)
-    case (MessageAction.FORWARD, message)       => forwardMessage(message)
-    case (MessageAction.LIKE, message)          => toggleLike(message)
-    case (MessageAction.UNLIKE, message)        => toggleLike(message)
-    case (MessageAction.SAVE, message)          => saveMessage(message)
+    case (MessageAction.COPY, message)             => copyMessage(message)
+    case (MessageAction.DELETE_GLOBAL, message)    => recallMessage(message)
+    case (MessageAction.DELETE_LOCAL, message)     => deleteMessage(message)
+    case (MessageAction.FORWARD, message)          => forwardMessage(message)
+    case (MessageAction.LIKE, message)             => toggleLike(message)
+    case (MessageAction.UNLIKE, message)           => toggleLike(message)
+    case (MessageAction.SAVE, message)             => saveMessage(message)
+    case (MessageAction.FORWARD_MULTIPLE, message) => forwardMessageToMultipleConversations(message)
     case _ => // should be handled somewhere else
   }
 
@@ -174,6 +177,11 @@ class MessageActionsController(implicit injector: Injector, ctx: Context, ec: Ev
         }
       })
     }
+  }
+
+  private def forwardMessageToMultipleConversations(message: Message) = {
+    val shareDialog = ShareToMultipleFragment.newInstance(MessageId(message.getId))
+    shareDialog.show(fragmentManager, ShareToMultipleFragment.TAG)
   }
 
   private def saveMessage(message: Message) =

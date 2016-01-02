@@ -31,7 +31,6 @@ import android.view.ViewGroup;
 import com.waz.api.IConversation;
 import com.waz.api.Message;
 import com.waz.api.User;
-import com.waz.model.AssetId;
 import com.waz.model.MessageData;
 import com.waz.zclient.OnBackPressedListener;
 import com.waz.zclient.R;
@@ -45,7 +44,7 @@ import com.waz.zclient.controllers.navigation.Page;
 import com.waz.zclient.controllers.onboarding.OnboardingControllerObserver;
 import com.waz.zclient.controllers.singleimage.SingleImageObserver;
 import com.waz.zclient.conversation.CollectionFragment;
-import com.waz.zclient.conversation.CollectionShareFragment;
+import com.waz.zclient.conversation.ShareToMultipleFragment;
 import com.waz.zclient.core.controllers.tracking.attributes.RangedAttribute;
 import com.waz.zclient.pages.BaseFragment;
 import com.waz.zclient.pages.main.backgroundmain.views.BackgroundFrameLayout;
@@ -391,15 +390,15 @@ public class MainPhoneFragment extends BaseFragment<MainPhoneFragment.Container>
     public void shareCollectionItem(MessageData messageData) {
         getChildFragmentManager().beginTransaction()
                                 .add(R.id.fl__overlay_container,
-                                    CollectionShareFragment.newInstance(messageData.assetId()),
-                                    CollectionShareFragment.TAG())
-                                .addToBackStack(CollectionShareFragment.TAG())
+                                    ShareToMultipleFragment.newInstance(messageData.id()),
+                                    ShareToMultipleFragment.TAG())
+                                .addToBackStack(ShareToMultipleFragment.TAG())
                                 .commit();
     }
 
     @Override
     public void closeCollectionShare() {
-        getChildFragmentManager().popBackStackImmediate(CollectionShareFragment.TAG(),
+        getChildFragmentManager().popBackStackImmediate(ShareToMultipleFragment.TAG(),
             FragmentManager.POP_BACK_STACK_INCLUSIVE);
     }
 

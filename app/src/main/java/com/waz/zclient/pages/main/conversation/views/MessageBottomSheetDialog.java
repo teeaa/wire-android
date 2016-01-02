@@ -25,9 +25,12 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+
+import com.waz.api.Asset;
 import com.waz.api.AssetStatus;
 import com.waz.api.Message;
 import com.waz.zclient.R;
+import com.waz.zclient.core.api.scala.ModelObserver;
 import com.waz.zclient.utils.ViewUtils;
 
 public class MessageBottomSheetDialog extends BottomSheetDialog {
@@ -44,7 +47,8 @@ public class MessageBottomSheetDialog extends BottomSheetDialog {
         UNLIKE(R.id.message_bottom_menu_item_unlike, R.string.glyph__liked, R.string.message_bottom_menu_action_unlike),
         SAVE(R.id.message_bottom_menu_item_save, R.string.glyph__download, R.string.message_bottom_menu_action_save),
         OPEN_FILE(R.id.message_bottom_menu_item_open_file, R.string.glyph__view, R.string.message_bottom_menu_action_open),
-        EDIT(R.id.message_bottom_menu_item_edit, R.string.glyph__edit, R.string.message_bottom_menu_action_edit);
+        EDIT(R.id.message_bottom_menu_item_edit, R.string.glyph__edit, R.string.message_bottom_menu_action_edit),
+        FORWARD_MULTIPLE(R.id.message_bottom_menu_item_forward_multiple, R.string.glyph__forward, R.string.message_bottom_menu_action_forward_multiple);
 
         public int resId;
         public int glyphResId;
@@ -64,9 +68,8 @@ public class MessageBottomSheetDialog extends BottomSheetDialog {
         init(isMemberOfConversation);
     }
 
-    @SuppressLint("InflateParams")
-    private void init(boolean isMemberOfConversation) {
-        LinearLayout view = (LinearLayout) getLayoutInflater().inflate(R.layout.message__bottom__menu, null);
+    private void updateOptions(LinearLayout view, boolean isMemberOfConversation) {
+        view.removeAllViews();
         if (isMemberOfConversation && isLikeAllowed()) {
             if (message.isLikedByThisUser()) {
                 addAction(view, MessageAction.UNLIKE);
@@ -89,10 +92,30 @@ public class MessageBottomSheetDialog extends BottomSheetDialog {
         if (isForwardAllowed()) {
             addAction(view, MessageAction.FORWARD);
         }
+        if (isMultipleForwardAllowed()) {
+            addAction(view, MessageAction.FORWARD_MULTIPLE);
+        }
         addAction(view, MessageAction.DELETE_LOCAL);
         if (isDeleteForEveryoneAllowed(isMemberOfConversation)) {
             addAction(view, MessageAction.DELETE_GLOBAL);
         }
+    }
+
+    @SuppressLint("InflateParams")
+    private void init(final boolean isMemberOfConversation) {
+        final LinearLayout view = (LinearLayout) getLayoutInflater().inflate(R.layout.message__bottom__menu, null);
+
+        ModelObserver<Asset> assetModelObserver = new ModelObserver<Asset>() {
+            @Override
+            public void updated(Asset model) {
+                if (!model.isEmpty()) {
+                    updateOptions(view, isMemberOfConversation);
+                }
+            }
+        };
+
+        assetModelObserver.setAndUpdate(message.getAsset());
+        updateOptions(view, isMemberOfConversation);
         setContentView(view);
     }
 
@@ -209,6 +232,10 @@ public class MessageBottomSheetDialog extends BottomSheetDialog {
             default:
                 return false;
         }
+    }
+
+    private boolean isMultipleForwardAllowed() {
+        return isForwardAllowed();
     }
 
     private boolean isEditAllowed(boolean isMemberOfConversation) {

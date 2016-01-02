@@ -126,9 +126,9 @@ class StubCollectionController extends ICollectionsController{
 
   override def messagesByType(`type`: Type, limit: Int): Signal[Seq[MessageData]] = Signal(Seq())
 
-  override def openCollection: Unit = {}
+  override def openCollection(): Unit = {}
 
-  override def closeCollection: Unit = {}
+  override def closeCollection(): Unit = {}
 
   override def requestPreviousItem(): Unit = {}
 

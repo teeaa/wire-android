@@ -1,4 +1,21 @@
 /**
+ * Wire
+ * Copyright (C) 2016 Wire Swiss GmbH
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+/**
   * Wire
   * Copyright (C) 2016 Wire Swiss GmbH
   *
@@ -18,7 +35,6 @@
 package com.waz.zclient.conversation
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.support.v7.widget.RecyclerView
 import android.support.v7.widget.RecyclerView.{AdapterDataObserver, ViewHolder}
 import android.util.AttributeSet
@@ -27,23 +43,16 @@ import android.view.{LayoutInflater, View, ViewGroup}
 import android.widget.{LinearLayout, TextView}
 import com.waz.ZLog._
 import com.waz.api.Message
-import com.waz.bitmap.BitmapUtils
 import com.waz.model._
-import com.waz.service.ZMessaging
-import com.waz.service.assets.AssetService.BitmapResult
-import com.waz.service.assets.AssetService.BitmapResult.BitmapLoaded
-import com.waz.service.images.BitmapSignal
 import com.waz.threading.Threading
-import com.waz.ui.MemoryImageCache.BitmapRequest.Single
 import com.waz.utils.events.{EventContext, Signal}
 import com.waz.utils.returning
 import com.waz.zclient.conversation.CollectionAdapter._
-import com.waz.zclient.pages.main.conversation.views.AspectRatioImageView
 import com.waz.zclient.ui.text.GlyphTextView
 import com.waz.zclient.ui.utils.ResourceUtils
 import com.waz.zclient.utils.ViewUtils
-import com.waz.zclient.views.{CollectionItemView, FileViewHolder, LinkPreviewViewHolder, SimpleLinkViewHolder}
-import com.waz.zclient.{Injectable, Injector, R, ViewHelper}
+import com.waz.zclient.views._
+import com.waz.zclient.{Injectable, Injector, R}
 import org.threeten.bp._
 import org.threeten.bp.temporal.ChronoUnit
 
@@ -196,23 +205,8 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
 
   val imageListener = new OnClickListener {
     override def onClick(v: View): Unit = {
-      v.getTag match {
-        case md: MessageData => ctrler.focusedItem ! Some(md)
-        case _ =>
-      }
-    }
-  }
-
-  val fileListener = new OnClickListener {
-    override def onClick(v: View): Unit = {
-      // TODO
-    }
-  }
-
-  val linkListener = new OnClickListener {
-    override def onClick(v: View): Unit = {
-      v.getTag match {
-        case md: MessageData => ctrler.focusedItem ! Some(md)
+      v match {
+        case collectionItemView: CollectionItemView => ctrler.focusedItem ! collectionItemView.messageData.currentValue
         case _ =>
       }
     }
@@ -220,10 +214,10 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
 
   override def onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder =
     viewType match {
-      case CollectionAdapter.VIEW_TYPE_FILE => FileViewHolder(inflateCollectionItemView(R.layout.collection_file_asset, parent))
+      case CollectionAdapter.VIEW_TYPE_FILE => FileViewHolder(inflateCollectionNormalItemView(R.layout.collection_file_asset, parent))
       case CollectionAdapter.VIEW_TYPE_IMAGE => CollectionImageViewHolder(inflateCollectionImageView(parent), imageListener)
-      case CollectionAdapter.VIEW_TYPE_LINK_PREVIEW => LinkPreviewViewHolder(inflateCollectionItemView(R.layout.collection_link_preview, parent))
-      case CollectionAdapter.VIEW_TYPE_SIMPLE_LINK => SimpleLinkViewHolder(inflateCollectionItemView(R.layout.collection_text, parent))
+      case CollectionAdapter.VIEW_TYPE_LINK_PREVIEW => LinkPreviewViewHolder(inflateCollectionNormalItemView(R.layout.collection_link_preview, parent))
+      case CollectionAdapter.VIEW_TYPE_SIMPLE_LINK => SimpleLinkViewHolder(inflateCollectionNormalItemView(R.layout.collection_text, parent))
       case _ => returning(null.asInstanceOf[ViewHolder])(_ => error(s"Unexpected ViewType: $viewType"))
     }
 
@@ -233,8 +227,8 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
     view
   }
 
-  private def inflateCollectionItemView(contentId: Int, parent: ViewGroup): CollectionItemView = {
-    val view = new CollectionItemView(context)
+  private def inflateCollectionNormalItemView(contentId: Int, parent: ViewGroup): CollectionNormalItemView = {
+    val view = new CollectionNormalItemView(context)
     view.inflateContent(contentId)
     parent.addView(view)
     view
@@ -402,52 +396,5 @@ object CollectionAdapter {
     LayoutInflater.from(context).inflate(R.layout.row_collection_header, this, true)
   }
 
-  class CollectionImageView(context: Context) extends AspectRatioImageView(context) with ViewHelper {
-    val zms = inject[Signal[ZMessaging]]
-    val messageData = Signal[MessageData]()
-    val width = Signal[Int]()
 
-    messageData.zip(width).flatMap{
-      case (msg, w) =>
-        zms.flatMap { zms =>
-          zms.assetsStorage.signal(msg.assetId).flatMap {
-            case data@AssetData.IsImage() => BitmapSignal(data, Single(w), zms.imageLoader, zms.imageCache)
-            case _ => Signal.empty[BitmapResult]
-          }.map{
-            case BitmapLoaded(bmp, _) => Option(BitmapUtils.cropRect(bmp, w))
-            case _ => None
-          }
-        }
-      case _ => Signal[Option[Bitmap]](None)
-    }.on(Threading.Ui) {
-      case Some(b) => setImageBitmap(b)
-      case _ =>
-    }
-
-    def setMessageData(messageData: MessageData, width: Int, color: Int) = {
-      setAspectRatio(1)
-      ViewUtils.setWidth(this, width)
-      ViewUtils.setHeight(this, width)
-      if (this.messageData.currentValue.exists(_.assetId != messageData.assetId) || this.width.currentValue.exists(_ != width)) {
-        setImageBitmap(null)
-        setBackgroundColor(color)
-        setAlpha(0f)
-        animate
-          .alpha(1f)
-          .setDuration(context.getResources.getInteger(R.integer.content__image__directly_final_duration))
-          .start()
-      }
-      this.width ! width
-      this.messageData ! messageData
-    }
-  }
-
-  case class CollectionImageViewHolder(view: CollectionImageView, listener: OnClickListener)(implicit eventContext: EventContext) extends RecyclerView.ViewHolder(view) {
-    view.setOnClickListener(listener)
-
-    def setMessageData(messageData: MessageData, width: Int, color: Int) = {
-      view.setTag(messageData)
-      view.setMessageData(messageData, width, color)
-    }
-  }
 }

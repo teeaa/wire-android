@@ -46,6 +46,7 @@
     <item name="message_bottom_menu_item_unlike" type="id" />
     <item name="message_bottom_menu_item_save" type="id" />
     <item name="message_bottom_menu_item_open_file" type="id" />
+    <item name="message_bottom_menu_item_forward_multiple" type="id" />
 
     <item name="video_calling_view" type="id" />
 

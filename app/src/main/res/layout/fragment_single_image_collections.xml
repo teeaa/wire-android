@@ -29,25 +29,7 @@
     <com.waz.zclient.views.images.TouchImageView
         android:id="@+id/tiv__image_view"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="match_parent"
         android:scaleType="fitCenter"/>
-
-    <RelativeLayout
-        android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:background="?wireDividerColorSolid">
-
-        <com.waz.zclient.ui.text.GlyphTextView
-            android:id="@+id/gtv__share_button"
-            android:layout_centerInParent="true"
-            android:padding="@dimen/wire__padding__8"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:textSize="@dimen/wire__text_size__regular"
-            android:gravity="center"
-            android:text="@string/glyph__share"/>
-
-    </RelativeLayout>
 
 </LinearLayout>
