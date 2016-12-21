@@ -127,7 +127,7 @@ protected class AudioParticipantChatheadView(val context: Context, val attrs: At
   lazy val gainView: CallingGainView = findById(R.id.cgv__calling__participant__gain)
 
   (for {
-    userStorage <- controller.userStorage
+    userStorage <- controller.glob.userStorage
     userId <- userId
     userData <- userStorage.signal(userId)
   } yield userData).on(Threading.Ui)(data => gainView.setGainColor(AccentColor(data.accent).getColor()))
@@ -145,7 +145,7 @@ protected class AudioParticipantChatheadView(val context: Context, val attrs: At
   }.on(Threading.Ui)(nameView.setVisibility)
 
   (for {
-    (vcs, convId) <- controller.voiceServiceAndCurrentConvId
+    (vcs, convId) <- controller.glob.voiceServiceAndCurrentConvId
     userId <- userId
     volume <- vcs.volumeChanged(convId, userId)
   } yield volume).on(Threading.Ui)(gainView.onGainHasChanged(_))
