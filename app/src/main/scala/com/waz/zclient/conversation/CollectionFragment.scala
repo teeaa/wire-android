@@ -20,27 +20,42 @@ package com.waz.zclient.conversation
 import android.content.Context
 import android.os.Bundle
 import android.support.v4.app.FragmentManager
-import android.support.v7.widget.RecyclerView.AdapterDataObserver
 import android.support.v7.widget.{GridLayoutManager, LinearLayoutManager, RecyclerView, Toolbar}
 import android.view.View.{OnClickListener, OnTouchListener}
 import android.view.{LayoutInflater, MotionEvent, View, ViewGroup}
 import android.widget.TextView
 import com.waz.ZLog._
+import com.waz.api.Message
 import com.waz.model.AssetId
 import com.waz.threading.Threading
+import com.waz.utils.events.Signal
+import com.waz.zclient.controllers.collections.CollectionsObserver
 import com.waz.zclient.pages.BaseFragment
 import com.waz.zclient.pages.main.conversation.collections.CollectionItemDecorator
 import com.waz.zclient.utils.ViewUtils
 import com.waz.zclient.{FragmentHelper, OnBackPressedListener, R}
+import org.threeten.bp.{LocalDateTime, ZoneId}
 
-class CollectionFragment extends BaseFragment[CollectionFragment.Container] with FragmentHelper with OnBackPressedListener  {
+class CollectionFragment extends BaseFragment[CollectionFragment.Container] with FragmentHelper with OnBackPressedListener with CollectionsObserver  {
 
   private implicit lazy val context: Context = getContext
 
   private implicit val tag: LogTag = logTagFor[CollectionFragment]
 
-  lazy val controller = new CollectionController
+  lazy val controller = getControllerFactory.getCollectionsController
   var adapter: CollectionAdapter = null
+
+
+  override def onStart(): Unit = {
+    super.onStart()
+    controller.addObserver(this)
+  }
+
+
+  override def onStop(): Unit = {
+    super.onStop()
+    controller.removeObserver(this)
+  }
 
   private def showSingleImage(assetId: AssetId) = {
     getChildFragmentManager.findFragmentByTag(SingleImageCollectionFragment.TAG) match {
@@ -51,7 +66,17 @@ class CollectionFragment extends BaseFragment[CollectionFragment.Container] with
   }
 
   private def closeSingleImage() = {
-    getChildFragmentManager.popBackStackImmediate(SingleImageCollectionFragment.TAG, FragmentManager.POP_BACK_STACK_INCLUSIVE)
+    getChildFragmentManager.findFragmentByTag(SingleImageCollectionFragment.TAG) match {
+      case null =>
+      case _ => getChildFragmentManager.popBackStackImmediate(SingleImageCollectionFragment.TAG, FragmentManager.POP_BACK_STACK_INCLUSIVE)
+    }
+  }
+
+  private def textIdForContentMode(contentMode: Int) = contentMode match {
+    case CollectionAdapter.VIEW_MODE_IMAGES => R.string.library_header_pictures
+    case CollectionAdapter.VIEW_MODE_FILES => R.string.library_header_files
+    case CollectionAdapter.VIEW_MODE_LINKS => R.string.library_header_links
+    case _ => R.string.library_header_all
   }
 
   override def onCreateView(inflater: LayoutInflater, container: ViewGroup, savedInstanceState: Bundle): View = {
@@ -62,33 +87,31 @@ class CollectionFragment extends BaseFragment[CollectionFragment.Container] with
     val emptyView: View = ViewUtils.getView(view, R.id.ll__collection__empty)
     emptyView.setVisibility(View.GONE)
 
-    controller.conversationName.on(Threading.Ui)(name.setText)
-
-    controller.singleImage.on(Threading.Ui) {
-      case Some(id) => showSingleImage(id)
+    controller.focusedItem.on(Threading.Ui) {
+      case Some(md) if md.msgType == Message.Type.ASSET => showSingleImage(md.assetId)
       case _ => closeSingleImage()
     }
 
     val columns = 4
     adapter = new CollectionAdapter(ViewUtils.getRealDisplayWidth(context), columns, controller)
-    adapter.registerAdapterDataObserver(new AdapterDataObserver {
-      override def onChanged(): Unit = {
-        if (adapter.getItemCount == 0) {
-          emptyView.setVisibility(View.VISIBLE)
-          recyclerView.setVisibility(View.GONE)
-        } else {
-          emptyView.setVisibility(View.GONE)
-          recyclerView.setVisibility(View.VISIBLE)
-        }
-        val contentId = adapter.contentMode match {
-          case CollectionAdapter.VIEW_MODE_IMAGES => R.string.library_header_pictures
-          case CollectionAdapter.VIEW_MODE_FILES => R.string.library_header_files
-          case CollectionAdapter.VIEW_MODE_LINKS => R.string.library_header_links
-          case _ => R.string.library_header_all
-        }
-        contentView.setText(contentId)
-      }
-    })
+
+    Signal(adapter.adapterState, controller.focusedItem, controller.conversationName).on(Threading.Ui) {
+      case ((_, _), Some(messageData), conversationName) =>
+        name.setText(LocalDateTime.ofInstant(messageData.time, ZoneId.systemDefault()).toLocalDate.toString)
+        contentView.setText(conversationName)
+      case ((contentMode, 0), None, conversationName) =>
+        emptyView.setVisibility(View.VISIBLE)
+        recyclerView.setVisibility(View.GONE)
+        contentView.setText(textIdForContentMode(contentMode))
+        name.setText(conversationName)
+      case ((contentMode, _), None, conversationName) =>
+        emptyView.setVisibility(View.GONE)
+        recyclerView.setVisibility(View.VISIBLE)
+        contentView.setText(textIdForContentMode(contentMode))
+        name.setText(conversationName)
+      case _ =>
+    }
+
     val collectionItemDecorator = new CollectionItemDecorator(adapter, columns)
     recyclerView.setAdapter(adapter)
     recyclerView.setOnTouchListener(new OnTouchListener {
@@ -118,13 +141,31 @@ class CollectionFragment extends BaseFragment[CollectionFragment.Container] with
 
   override def onBackPressed(): Boolean = {
     getChildFragmentManager.findFragmentByTag(SingleImageCollectionFragment.TAG) match {
-      case fragment: SingleImageCollectionFragment => controller.singleImage ! None; return true
+      case fragment: SingleImageCollectionFragment => controller.focusedItem ! None; return true
       case _ =>
     }
     if (!adapter.onBackPressed)
-      getControllerFactory.getGiphyController.closeCollection()
+      getControllerFactory.getCollectionsController.closeCollection
     true
   }
+
+  override def openCollection(): Unit = {}
+
+  override def forwardCollectionMessage(message: Message): Unit = {}
+
+  override def previousItemRequested(): Unit =
+    controller.focusedItem mutate {
+      case Some(messageData) => Some(adapter.getPreviousItem(messageData).getOrElse(messageData))
+      case _ => None
+    }
+
+  override def nextItemRequested(): Unit =
+    controller.focusedItem mutate {
+      case Some(messageData) => Some(adapter.getNextItem(messageData).getOrElse(messageData))
+      case _ => None
+    }
+
+  override def closeCollection(): Unit = {}
 }
 
 object CollectionFragment {

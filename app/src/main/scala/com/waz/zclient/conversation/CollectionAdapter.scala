@@ -23,16 +23,15 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.support.v4.content.ContextCompat
 import android.support.v7.widget.RecyclerView
-import android.support.v7.widget.RecyclerView.ViewHolder
+import android.support.v7.widget.RecyclerView.{AdapterDataObserver, ViewHolder}
 import android.text.format.Formatter
 import android.util.AttributeSet
 import android.view.View.OnClickListener
-import android.view.ViewGroup.LayoutParams
 import android.view.{LayoutInflater, View, ViewGroup}
 import android.widget.{LinearLayout, TextView}
 import com.waz.ZLog._
 import com.waz.api.Message
-import com.waz.model.{AssetData, AssetId, MessageData}
+import com.waz.model.{AssetData, AssetId, MessageData, MessageId}
 import com.waz.threading.Threading
 import com.waz.utils.events.{EventContext, Signal}
 import com.waz.utils.returning
@@ -46,7 +45,7 @@ import org.threeten.bp.temporal.ChronoUnit
 import org.threeten.bp.{Instant, LocalDateTime, ZoneId}
 
 //For now just handling images
-class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: CollectionController)(implicit context: Context, injector: Injector, eventContext: EventContext) extends RecyclerView.Adapter[ViewHolder] with Injectable {
+class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsController)(implicit context: Context, injector: Injector, eventContext: EventContext) extends RecyclerView.Adapter[ViewHolder] with Injectable {
 
   private implicit val tag: LogTag = logTagFor[CollectionAdapter]
 
@@ -95,6 +94,13 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: CollectionContro
   }
 
   var header: CollectionHeaderLinearLayout = null
+  val adapterState = Signal[(Int, Int)](contentMode, -1)
+
+  registerAdapterDataObserver(new AdapterDataObserver {
+    override def onChanged(): Unit = {
+      adapterState ! (contentMode, getItemCount)
+    }
+  })
 
   override def getItemCount: Int = {
     contentMode match {
@@ -111,6 +117,7 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: CollectionContro
         all.currentValue.getOrElse(Seq.empty)(position).msgType match {
           case Message.Type.ANY_ASSET => CollectionAdapter.VIEW_TYPE_FILE
           case Message.Type.ASSET => CollectionAdapter.VIEW_TYPE_IMAGE
+          case _ => CollectionAdapter.VIEW_TYPE_FILE
         }
       }
       case CollectionAdapter.VIEW_MODE_FILES => CollectionAdapter.VIEW_TYPE_FILE
@@ -121,8 +128,8 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: CollectionContro
 
   override def onBindViewHolder(holder: ViewHolder, position: Int): Unit = {
     holder match {
-      case f: FileViewHolder => assetSignal(if (contentMode == CollectionAdapter.VIEW_MODE_ALL) _all else _files, position).foreach(f.setAsset)
-      case c: CollViewHolder => assetSignal(if (contentMode == CollectionAdapter.VIEW_MODE_ALL) _all else _images, position).foreach(s => c.setAsset(s, ctrler.bitmapSquareSignal, screenWidth / columns, ResourceUtils.getRandomAccentColor(context)))
+      case f: FileViewHolder => assetSignal(if (contentMode == CollectionAdapter.VIEW_MODE_ALL) _all else _files, position).foreach(a => f.setAsset(a._2))
+      case c: CollViewHolder => assetSignal(if (contentMode == CollectionAdapter.VIEW_MODE_ALL) _all else _images, position).foreach(s => c.setAssetMessage(s._1, s._2, ctrler.bitmapSquareSignal, screenWidth / columns, ResourceUtils.getRandomAccentColor(context)))
     }
   }
 
@@ -159,12 +166,12 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: CollectionContro
     }
   }
 
-  private def assetSignal(col: Seq[MessageData], pos: Int): Option[Signal[AssetData]] = col.lift(pos).map(m => ctrler.assetSignal(m.assetId))
+  private def assetSignal(col: Seq[MessageData], pos: Int): Option[(MessageData, Signal[AssetData])] = col.lift(pos).map(m => (m, ctrler.assetSignal(m.assetId)))
 
   val imageListener = new OnClickListener {
     override def onClick(v: View): Unit = {
       v.getTag match {
-        case assetId: AssetId if contentMode == CollectionAdapter.VIEW_MODE_IMAGES => ctrler.singleImage ! Some(assetId)
+        case md: MessageData if contentMode == CollectionAdapter.VIEW_MODE_IMAGES => ctrler.focusedItem ! Some(md)
         case _ =>
       }
     }
@@ -205,6 +212,7 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: CollectionContro
           case Message.Type.ANY_ASSET => Header.mainFiles
           case Message.Type.ASSET => Header.mainImages
           case Message.Type.RICH_MEDIA => Header.mainLinks
+          case _ => Header.mainImages
         }
       }
       case _ => {
@@ -250,6 +258,29 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: CollectionContro
       case Header.`subYesterday` => "YESTERDAY"
       case Header.`subAgesAgo` => "AGES AGO"
       case _ => "Whatever"
+    }
+  }
+
+  def getItemPosition(messageData: MessageData): Int = {
+    contentMode match {
+      case CollectionAdapter.VIEW_MODE_ALL => all.currentValue.map(_.indexOf(messageData)).getOrElse(-1)
+      case CollectionAdapter.VIEW_MODE_FILES => files.currentValue.map(_.indexOf(messageData)).getOrElse(-1)
+      case CollectionAdapter.VIEW_MODE_IMAGES => images.currentValue.map(_.indexOf(messageData)).getOrElse(-1)
+      case _ => -1
+    }
+  }
+
+  def getPreviousItem(messageData: MessageData): Option[MessageData] = {
+    getItemPosition(messageData) match {
+      case 0 => None
+      case pos => Some(getItem(pos - 1))
+    }
+  }
+
+  def getNextItem(messageData: MessageData): Option[MessageData] = {
+    getItemPosition(messageData) match {
+      case pos if pos >= getItemCount - 1 => None
+      case pos => Some(getItem(pos + 1))
     }
   }
 
@@ -305,18 +336,22 @@ object CollectionAdapter {
   case class CollViewHolder(view: AspectRatioImageView, listener: OnClickListener)(implicit eventContext: EventContext) extends RecyclerView.ViewHolder(view) {
     view.setOnClickListener(listener)
 
-    def setAsset(asset: Signal[AssetData], bitmap: (AssetId, Int) => Signal[Option[Bitmap]], width: Int, color: Int) = asset.on(Threading.Ui) { a =>
-      view.setTag(a.id)
+    def setAssetMessage(messageData: MessageData, asset: Signal[AssetData], bitmap: (AssetId, Int) => Signal[Option[Bitmap]], width: Int, color: Int) = {
+      view.setTag(messageData)
       view.setAspectRatio(1)
       view.setImageBitmap(null)
       view.setBackgroundColor(color)
       ViewUtils.setWidth(view, width)
       ViewUtils.setHeight(view, width)
-      bitmap(a.id, view.getWidth).on(Threading.Ui) {
+      view.setAlpha(0f)
+      view.animate
+        .alpha(1f)
+        .setDuration(view.getContext.getResources.getInteger(R.integer.content__image__directly_final_duration))
+        .start()
+      asset.flatMap(a => bitmap(a.id, width)).on(Threading.Ui) {
         case Some(b) => view.setImageBitmap(b)
         case None => //TODO bitmap didn't load
       }
-
     }
   }
 

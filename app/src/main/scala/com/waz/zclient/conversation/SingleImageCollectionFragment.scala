@@ -19,41 +19,82 @@ package com.waz.zclient.conversation
 
 import android.graphics.Bitmap
 import android.os.Bundle
-import android.view.View.OnClickListener
-import android.view.{LayoutInflater, View, ViewGroup}
-import android.widget.{ImageView, RelativeLayout}
+import android.view.GestureDetector.SimpleOnGestureListener
+import android.view.View.{OnClickListener, OnLayoutChangeListener, OnTouchListener}
+import android.view._
 import com.waz.model.{AssetData, AssetId}
 import com.waz.threading.Threading
 import com.waz.utils.events.Signal
 import com.waz.zclient.pages.BaseFragment
-import com.waz.zclient.{FragmentHelper, OnBackPressedListener, R, ViewHelper}
+import com.waz.zclient.{FragmentHelper, OnBackPressedListener, R}
 import com.waz.zclient.ui.text.GlyphTextView
 import com.waz.zclient.utils.ViewUtils
+import com.waz.zclient.views.images.TouchImageView
 
 class SingleImageCollectionFragment extends BaseFragment[CollectionFragment.Container] with FragmentHelper with OnBackPressedListener {
 
-  lazy val collectionController = new CollectionController()
+  lazy val collectionController = getControllerFactory.getCollectionsController
 
   override def onCreateView(inflater: LayoutInflater, container: ViewGroup, savedInstanceState: Bundle): View = {
     val view = inflater.inflate(R.layout.fragment_single_image_collections, container, false)
     val shareButton: GlyphTextView = ViewUtils.getView(view, R.id.gtv__share_button)
-    val assetId = AssetId(getArguments.getString(SingleImageCollectionFragment.ARG_ASSET_ID))
-    setAsset(assetId)
+    val imageView: TouchImageView = ViewUtils.getView(view, R.id.tiv__image_view)
     shareButton.setOnClickListener(new OnClickListener {
-      override def onClick(v: View): Unit = {}
+      override def onClick(v: View): Unit = {
+        collectionController.focusedItem.currentValue match {
+          case Some(Some(messageData)) => collectionController.shareMessageData(messageData)
+          case _ =>
+        }
+      }
     })
+
+    val gestureDetector = new GestureDetector(getContext, new SimpleOnGestureListener(){
+      override def onFling(e1: MotionEvent, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean = {
+        if (imageView.isZoomed) return true
+        if (velocityX > SingleImageCollectionFragment.MIN_FLING_THRESHOLD) {
+          collectionController.requestPreviousItem()
+        } else if (velocityX < -SingleImageCollectionFragment.MIN_FLING_THRESHOLD) {
+          collectionController.requestNextItem()
+        }
+        true
+      }
+    })
+
+    imageView.setOnTouchListener(new OnTouchListener {
+      override def onTouch(v: View, event: MotionEvent): Boolean = gestureDetector.onTouchEvent(event)
+    })
+
     view
+  }
+
+  override def onViewCreated(view: View, savedInstanceState: Bundle): Unit = {
+    super.onViewCreated(view, savedInstanceState)
+
+    lazy val onLayoutChangeListener: OnLayoutChangeListener = new OnLayoutChangeListener {
+      override def onLayoutChange(v: View, left: Int, top: Int, right: Int, bottom: Int, oldLeft: Int, oldTop: Int, oldRight: Int, oldBottom: Int): Unit = {
+        val assetId = AssetId(getArguments.getString(SingleImageCollectionFragment.ARG_ASSET_ID))
+        setAsset(assetId)
+        view.removeOnLayoutChangeListener(onLayoutChangeListener)
+      }
+    }
+    view.addOnLayoutChangeListener(onLayoutChangeListener)
   }
 
   override def onBackPressed(): Boolean = true
 
   def setAsset(assetId: AssetId): Unit = setAsset(collectionController.assetSignal(assetId), collectionController.bitmapSignal)
 
-  private def setAsset(asset: Signal[AssetData], bitmap: (AssetId, Int) => Signal[Option[Bitmap]]): Unit = asset.on(Threading.Ui) { a =>
-    val imageView: ImageView = ViewUtils.getView(getView, R.id.ariv__image_view)
+  private def setAsset(asset: Signal[AssetData], bitmap: (AssetId, Int) => Signal[Option[Bitmap]]): Unit = {
+    val imageView: TouchImageView = ViewUtils.getView(getView, R.id.tiv__image_view)
     imageView.setImageBitmap(null)
-    bitmap(a.id, getView.getWidth).on(Threading.Ui) {
-      case Some(b) => imageView.setImageBitmap(b)
+    imageView.setAlpha(0f)
+    asset.flatMap(a => bitmap(a.id, getView.getWidth)).on(Threading.Ui) {
+      case Some(b) =>
+        imageView.setImageBitmap(b)
+        imageView.animate
+          .alpha(1f)
+          .setDuration(getResources.getInteger(R.integer.content__image__directly_final_duration))
+          .start()
       case None =>
     }
   }
@@ -63,7 +104,9 @@ object SingleImageCollectionFragment {
 
   val TAG = SingleImageCollectionFragment.getClass.getSimpleName
 
-  private val ARG_ASSET_ID = "ARG_ASSET_ID"
+  val ARG_ASSET_ID = "ARG_ASSET_ID"
+
+  private val MIN_FLING_THRESHOLD = 1000
 
   def newInstance(assetId: AssetId): SingleImageCollectionFragment = {
     val fragment = new SingleImageCollectionFragment

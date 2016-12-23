@@ -17,25 +17,58 @@
  */
 package com.waz.zclient.conversation
 
+import java.util
+import java.util.concurrent.CopyOnWriteArraySet
+
+import android.graphics.Bitmap
 import com.waz.ZLog._
-import com.waz.api.{IConversation, Message}
+import com.waz.api.{IConversation, Message, impl}
 import com.waz.bitmap.BitmapUtils
 import com.waz.content.MessagesStorage
 import com.waz.model.MessageData.MessageDataDao
-import com.waz.model.{AssetData, AssetId, ConvId}
+import com.waz.model._
 import com.waz.service.ZMessaging
 import com.waz.service.assets.AssetService.BitmapResult
 import com.waz.service.assets.AssetService.BitmapResult.BitmapLoaded
 import com.waz.service.images.BitmapSignal
 import com.waz.threading.SerialDispatchQueue
 import com.waz.ui.MemoryImageCache.BitmapRequest.Single
-import com.waz.utils.events.Signal
+import com.waz.utils.events.{Signal, SourceSignal}
+import com.waz.zclient.controllers.collections.CollectionsObserver
+import com.waz.zclient.conversation.CollectionController.Type
 import com.waz.zclient.{Injectable, Injector}
 
 import scala.concurrent.Future
 
-//testable!
-protected class CollectionController(implicit injector: Injector) extends Injectable {
+trait ICollectionsController {
+
+  val focusedItem: SourceSignal[Option[MessageData]]
+  val conversationName: Signal[String]
+
+  def messagesByType(`type`: CollectionController.Type, limit: Int = 0): Signal[Seq[MessageData]]
+
+  def assetSignal(id: AssetId): Signal[AssetData]
+
+  def bitmapSignal(assetId: AssetId, width: Int): Signal[Option[Bitmap]]
+
+  def bitmapSquareSignal(assetId: AssetId, width: Int): Signal[Option[Bitmap]]
+
+  def openCollection(): Unit
+
+  def closeCollection(): Unit
+
+  def requestPreviousItem(): Unit
+
+  def requestNextItem(): Unit
+
+  def shareMessageData(messageData: MessageData): Unit
+
+  def addObserver(collectionsObserver: CollectionsObserver): Unit
+
+  def removeObserver(collectionsObserver: CollectionsObserver): Unit
+}
+
+class CollectionController(implicit injector: Injector) extends Injectable with ICollectionsController {
 
   private implicit val tag: LogTag = logTagFor[CollectionController]
 
@@ -49,9 +82,9 @@ protected class CollectionController(implicit injector: Injector) extends Inject
 
   val assetStorage = zms.map(_.assetsStorage)
 
-  val singleImage = Signal[Option[AssetId]](None)
+  private val observers: java.util.Set[CollectionsObserver] = new util.HashSet[CollectionsObserver]
 
-  def messagesByType(tpe: CollectionController.Type, limit: Int = 0) = (for {
+  override def messagesByType(tpe: CollectionController.Type, limit: Int = 0) = (for {
     msgs <- msgStorage
     convId <- currentConv
   } yield {
@@ -60,11 +93,13 @@ protected class CollectionController(implicit injector: Injector) extends Inject
     Signal.future(Future.sequence(tpe.msgTypes.map(t => loadMessagesByType(convId, msgs, limit, t))).map(_.flatten))
   }
 
-  def assetSignal(id: AssetId) = assetStorage.flatMap(_.signal(id))
+  override def assetSignal(id: AssetId) = assetStorage.flatMap(_.signal(id))
 
   val conversation = zms.zip(currentConv) flatMap { case (zms, convId) => zms.convsStorage.signal(convId) }
 
-  val conversationName = conversation map (data => if (data.convType == IConversation.Type.GROUP) data.name.filter(!_.isEmpty).getOrElse(data.generatedName) else data.generatedName)
+  override val conversationName = conversation map (data => if (data.convType == IConversation.Type.GROUP) data.name.filter(!_.isEmpty).getOrElse(data.generatedName) else data.generatedName)
+
+  override val focusedItem: SourceSignal[Option[MessageData]] = Signal(None)
 
   //TODO - consider making messageType a Seq and passing that logic down to SE - (if we don't use a cursor)
   private def loadMessagesByType(conv: ConvId, storage: MessagesStorage, limit: Int, messageType: Message.Type) = {
@@ -78,16 +113,65 @@ protected class CollectionController(implicit injector: Injector) extends Inject
     }
   }
 
-  def bitmapSquareSignal(assetId: AssetId, width: Int) = loadBitmap(assetId: AssetId, width: Int).map {
+  override def bitmapSquareSignal(assetId: AssetId, width: Int) = loadBitmap(assetId: AssetId, width: Int).map {
     case BitmapLoaded(bmp, _) => Option(BitmapUtils.cropRect(bmp, width))
     case _ => None
   }
 
-  def bitmapSignal(assetId: AssetId, width: Int) = loadBitmap(assetId: AssetId, width: Int).map {
+  override def bitmapSignal(assetId: AssetId, width: Int) = loadBitmap(assetId: AssetId, width: Int).map {
     case BitmapLoaded(bmp, _) => Option(bmp)
     case _ => None
   }
 
+  private def performOnObservers(func: (CollectionsObserver) => Unit) = {
+    val collectionObservers: CopyOnWriteArraySet[CollectionsObserver] = new CopyOnWriteArraySet[CollectionsObserver](observers)
+    import scala.collection.JavaConversions._
+    for (observer <- collectionObservers) {
+      func(observer)
+    }
+  }
+
+  override def openCollection = performOnObservers(_.openCollection())
+
+  override def closeCollection = performOnObservers(_.closeCollection())
+
+  override def requestPreviousItem(): Unit = performOnObservers(_.previousItemRequested())
+
+  override def requestNextItem(): Unit = performOnObservers(_.nextItemRequested())
+
+  override def shareMessageData(messageData: MessageData): Unit = performOnObservers(_.forwardCollectionMessage(new impl.Message(messageData.id, messageData, IndexedSeq(), false)(ZMessaging.currentUi)))
+
+  override def addObserver(collectionsObserver: CollectionsObserver): Unit = observers.add(collectionsObserver)
+
+  override def removeObserver(collectionsObserver: CollectionsObserver): Unit = observers.remove(collectionsObserver)
+}
+
+class StubCollectionController extends ICollectionsController{
+
+  override val focusedItem: SourceSignal[Option[MessageData]] = Signal(None)
+  override val conversationName: Signal[String] = Signal("")
+
+  override def messagesByType(`type`: Type, limit: Int): Signal[Seq[MessageData]] = Signal(Seq())
+
+  override def openCollection: Unit = {}
+
+  override def assetSignal(id: AssetId): Signal[AssetData] = Signal(AssetData())
+
+  override def bitmapSignal(assetId: AssetId, width: Int): Signal[Option[Bitmap]] = Signal(None)
+
+  override def bitmapSquareSignal(assetId: AssetId, width: Int): Signal[Option[Bitmap]] = Signal(None)
+
+  override def closeCollection: Unit = {}
+
+  override def requestPreviousItem(): Unit = {}
+
+  override def requestNextItem(): Unit = {}
+
+  override def shareMessageData(messageData: MessageData): Unit = {}
+
+  override def addObserver(collectionsObserver: CollectionsObserver): Unit = {}
+
+  override def removeObserver(collectionsObserver: CollectionsObserver): Unit = {}
 }
 
 object CollectionController {
