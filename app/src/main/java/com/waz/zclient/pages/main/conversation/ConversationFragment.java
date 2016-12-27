@@ -117,6 +117,7 @@ import com.waz.zclient.core.stores.inappnotification.InAppNotificationStoreObser
 import com.waz.zclient.core.stores.inappnotification.KnockingEvent;
 import com.waz.zclient.core.stores.network.DefaultNetworkAction;
 import com.waz.zclient.core.stores.participants.ParticipantsStoreObserver;
+import com.waz.zclient.media.SoundController;
 import com.waz.zclient.messages.MessagesListView;
 import com.waz.zclient.messages.controllers.EditActionSupport;
 import com.waz.zclient.pages.BaseFragment;
@@ -1226,7 +1227,10 @@ public class ConversationFragment extends BaseFragment<ConversationFragment.Cont
                     @Override
                     public void execute(NetworkMode networkMode) {
                         getStoreFactory().getConversationStore().knockCurrentConversation();
-                        getStoreFactory().getMediaStore().playSound(R.raw.ping_from_me);
+                        SoundController ctrl = inject(SoundController.class);
+                        if (ctrl != null) {
+                            ctrl.playPingFromMe();
+                        }
                         getControllerFactory().getTrackingController().updateSessionAggregates(RangedAttribute.PINGS_SENT);
                     }
                 });
@@ -1310,7 +1314,10 @@ public class ConversationFragment extends BaseFragment<ConversationFragment.Cont
                     if (audioMessageRecordingView.getVisibility() == View.VISIBLE) {
                         break;
                     }
-                    getControllerFactory().getVibratorController().vibrate(R.array.alert);
+                    SoundController ctrl = inject(SoundController.class);
+                    if (ctrl != null) {
+                        ctrl.shortVibrate();
+                    }
                     audioMessageRecordingView.prepareForRecording();
                     audioMessageRecordingView.setVisibility(View.VISIBLE);
                     final IConversation conversation = getStoreFactory().getConversationStore().getCurrentConversation();

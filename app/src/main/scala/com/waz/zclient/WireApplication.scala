@@ -34,6 +34,7 @@ import com.waz.zclient.controllers.theme.IThemeController
 import com.waz.zclient.controllers.tracking.ITrackingController
 import com.waz.zclient.controllers.userpreferences.IUserPreferencesController
 import com.waz.zclient.core.stores.IStoreFactory
+import com.waz.zclient.media.SoundController
 import com.waz.zclient.messages.controllers.{MessageActionsController, NavigationController}
 import com.waz.zclient.messages.{LikesController, MessageViewFactory, MessagesController, UsersController}
 import com.waz.zclient.notifications.controllers.{CallingNotificationsController, ImageNotificationsController, MessageNotificationsController}
@@ -79,6 +80,7 @@ object WireApplication {
     bind [GlobalCallingController] to new GlobalCallingController()
     bind [GlobalCameraController]  to new GlobalCameraController(new AndroidCameraFactory)
     bind [SelectionController]     to new SelectionController()
+    bind [SoundController]         to new SoundController
 
     //notifications
     bind [MessageNotificationsController]  to new MessageNotificationsController()
