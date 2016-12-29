@@ -70,6 +70,7 @@ import com.waz.api.User;
 import com.waz.api.UsersList;
 import com.waz.api.Verification;
 import com.waz.zclient.BaseScalaActivity;
+import com.waz.model.MessageData;
 import com.waz.zclient.BuildConfig;
 import com.waz.zclient.OnBackPressedListener;
 import com.waz.zclient.R;
@@ -1125,7 +1126,12 @@ public class ConversationFragment extends BaseFragment<ConversationFragment.Cont
     }
 
     @Override
-    public void forwardCollectionMessage(Message message) {
+    public void shareCollectionItem(MessageData messageData) {
+
+    }
+
+    @Override
+    public void closeCollectionShare() {
     }
 
     //////////////////////////////////////////////////////////////////////////////
