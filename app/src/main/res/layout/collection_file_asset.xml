@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!--
+<?xml version="1.0" encoding="utf-8"?><!--
 
     Wire
     Copyright (C) 2016 Wire Swiss GmbH
@@ -19,10 +18,6 @@
 
 -->
 <com.waz.zclient.messages.parts.assets.FileAssetPartView xmlns:android="http://schemas.android.com/apk/res/android"
-                                                         android:id="@+id/fapv__message_file_asset"
-                                                         android:layout_width="@dimen/content__width"
+                                                         android:layout_width="match_parent"
                                                          android:layout_height="@dimen/content__audio_message__view_height"
-                                                         android:layout_gravity="center"
-                                                         android:layout_marginStart="@dimen/content__padding_left"
-                                                         android:paddingEnd="@dimen/content__row__padding_right"
     />

@@ -40,7 +40,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentLeft="true"
-            android:textColor="@color/black"
+            android:textColor="?wirePrimaryTextColor"
             android:textSize="@dimen/wire__text_size__small"
             app:font="@string/wire__typeface__light"
             />
@@ -49,21 +49,17 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentRight="true"
-            android:textColor="@color/wire__text_color_secondary_light_selector"
+            android:textColor="?wireSecondaryTextColor"
             android:textSize="@dimen/wire__text_size__small"
             app:font="@string/wire__typeface__light"
             />
     </RelativeLayout>
 
-    <android.support.v7.widget.CardView
-        android:id="@+id/cv__collections__content_card"
+    <FrameLayout
+        android:id="@+id/fl__collections__content_layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/wire__padding__4"
-        app:cardCornerRadius="@dimen/content__card__corner_radius"
-        app:cardBackgroundColor="@color/light_graphite_8"
-        app:cardElevation="0dp">
-
-    </android.support.v7.widget.CardView>
+        android:layout_marginTop="@dimen/wire__padding__4">
+    </FrameLayout>
 
 </LinearLayout>

@@ -1126,7 +1126,6 @@ public class ConversationFragment extends BaseFragment<ConversationFragment.Cont
 
     @Override
     public void forwardCollectionMessage(Message message) {
-       forwardMessage(message);
     }
 
     //////////////////////////////////////////////////////////////////////////////
