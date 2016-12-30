@@ -32,8 +32,6 @@ import com.waz.zclient.{Injectable, Injector, WireContext}
 
 class GlobalCallingController(implicit inj: Injector, cxt: WireContext, eventContext: EventContext) extends Injectable {
 
-  private implicit val eventContext = cxt.eventContext
-
   private val screenManager = new ScreenManager
   private val soundController = inject[SoundController]
 
