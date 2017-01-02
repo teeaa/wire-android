@@ -25,7 +25,7 @@ import android.view.View.OnClickListener
 import android.view.{HapticFeedbackConstants, LayoutInflater}
 import android.widget.{FrameLayout, LinearLayout, TextView}
 import com.waz.bitmap.BitmapUtils
-import com.waz.model.{AssetData, ConversationData, MessageContent, MessageData}
+import com.waz.model._
 import com.waz.service.ZMessaging
 import com.waz.service.assets.AssetService.BitmapResult
 import com.waz.service.assets.AssetService.BitmapResult.BitmapLoaded
@@ -89,7 +89,7 @@ class CollectionNormalItemView(context: Context, attrs: AttributeSet, style: Int
 }
 
 object CollectionNormalItemView{
-  val DefaultBindingOptions = MsgBindOptions(0, isSelf = false, isLast = false, isLastSelf = false, isFirstUnread = false, 0, ConversationData.ConversationType.Unknown)
+  val DefaultBindingOptions = MsgBindOptions(0, isSelf = false, isLast = false, isLastSelf = false, isFirstUnread = false, listDimensions = Dim2.Empty, ConversationData.ConversationType.Unknown)
 }
 
 class CollectionImageView(context: Context) extends AspectRatioImageView(context) with CollectionItemView{
