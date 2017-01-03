@@ -39,6 +39,7 @@ import com.waz.zclient.messages.MessageViewPart
 import com.waz.zclient.messages.controllers.MessageActionsController
 import com.waz.zclient.pages.main.conversation.views.AspectRatioImageView
 import com.waz.zclient.utils.{ViewUtils, _}
+import com.waz.zclient.views.ImageController.WireImage
 import com.waz.zclient.{R, ViewHelper}
 import org.threeten.bp.{LocalDateTime, ZoneId}
 
@@ -93,39 +94,15 @@ object CollectionNormalItemView{
 }
 
 class CollectionImageView(context: Context) extends AspectRatioImageView(context) with CollectionItemView{
-  val width = Signal[Int]()
-
-  messageData.zip(width).flatMap{
-    case (msg, w) =>
-      zms.flatMap { zms =>
-        zms.assetsStorage.signal(msg.assetId).flatMap {
-          case data@AssetData.IsImage() => BitmapSignal(data, Single(w), zms.imageLoader, zms.imageCache)
-          case _ => Signal.empty[BitmapResult]
-        }.map{
-          case BitmapLoaded(bmp, _) => Option(BitmapUtils.cropRect(bmp, w))
-          case _ => None
-        }
-      }
-    case _ => Signal[Option[Bitmap]](None)
-  }.on(Threading.Ui) {
-    case Some(b) => setImageBitmap(b)
-    case _ =>
+  messageData.on(Threading.Ui) { md =>
+    val imageDrawable = new ImageAssetDrawable(Signal(WireImage(md.assetId)), scaleType = ImageAssetDrawable.ScaleType.CenterCrop)
+    setImageDrawable(imageDrawable)
   }
 
   def setMessageData(messageData: MessageData, width: Int, color: Int) = {
     setAspectRatio(1)
     ViewUtils.setWidth(this, width)
     ViewUtils.setHeight(this, width)
-    if (this.messageData.currentValue.exists(_.assetId != messageData.assetId) || this.width.currentValue.exists(_ != width)) {
-      setImageBitmap(null)
-      setBackgroundColor(color)
-      setAlpha(0f)
-      animate
-        .alpha(1f)
-        .setDuration(context.getResources.getInteger(R.integer.content__image__directly_final_duration))
-        .start()
-    }
-    this.width ! width
     this.messageData ! messageData
   }
 }

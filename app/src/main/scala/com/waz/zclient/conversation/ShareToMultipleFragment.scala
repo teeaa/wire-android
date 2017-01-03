@@ -112,6 +112,7 @@ class ShareToMultipleFragment extends BaseDialogFragment[ShareToMultipleFragment
         if (dialog.isShowing) dialog.dismiss()
         sendMessage(text, adapter.selectedConversations.toSet)
         onBackPressed()
+        Toast.makeText(getContext, R.string.message_footer__status__sending, Toast.LENGTH_SHORT).show()
       case (Some(assetData), _) =>
         if (dialog.isShowing) dialog.dismiss()
         (assetData.assetType, assetData.source) match {
@@ -122,6 +123,7 @@ class ShareToMultipleFragment extends BaseDialogFragment[ShareToMultipleFragment
           case _ =>
         }
         onBackPressed()
+        Toast.makeText(getContext, R.string.message_footer__status__sending, Toast.LENGTH_SHORT).show()
     }
 
     sendButton.setOnClickListener(new OnClickListener {

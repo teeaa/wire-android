@@ -21,18 +21,15 @@ import android.os.Bundle
 import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.View.{OnLayoutChangeListener, OnLongClickListener, OnTouchListener}
 import android.view._
-import com.waz.model.{AssetData, AssetId}
+import com.waz.model.AssetId
 import com.waz.service.ZMessaging
-import com.waz.service.assets.AssetService.BitmapResult
-import com.waz.service.assets.AssetService.BitmapResult.BitmapLoaded
-import com.waz.service.images.BitmapSignal
 import com.waz.service.messages.MessageAndLikes
-import com.waz.threading.Threading
-import com.waz.ui.MemoryImageCache.BitmapRequest.Single
 import com.waz.utils.events.Signal
 import com.waz.zclient.messages.controllers.MessageActionsController
 import com.waz.zclient.pages.BaseFragment
 import com.waz.zclient.utils.ViewUtils
+import com.waz.zclient.views.ImageAssetDrawable
+import com.waz.zclient.views.ImageController.WireImage
 import com.waz.zclient.views.images.TouchImageView
 import com.waz.zclient.{FragmentHelper, OnBackPressedListener, R}
 
@@ -41,7 +38,6 @@ class SingleImageCollectionFragment extends BaseFragment[CollectionFragment.Cont
   lazy val collectionController = getControllerFactory.getCollectionsController
 
   lazy val zms = inject[Signal[ZMessaging]]
-  lazy val assetsStorage = zms.map(_.assetsStorage)
   lazy val messageActions = inject[MessageActionsController]
 
   lazy val messageAndLikes = zms.zip(collectionController.focusedItem).flatMap{
@@ -76,49 +72,31 @@ class SingleImageCollectionFragment extends BaseFragment[CollectionFragment.Cont
       override def onTouch(v: View, event: MotionEvent): Boolean = gestureDetector.onTouchEvent(event)
     })
 
+    imageView.setImageBitmap(null)
     view
   }
 
   override def onViewCreated(view: View, savedInstanceState: Bundle): Unit = {
     super.onViewCreated(view, savedInstanceState)
 
+    val imageView: TouchImageView = ViewUtils.getView(view, R.id.tiv__image_view)
     lazy val onLayoutChangeListener: OnLayoutChangeListener = new OnLayoutChangeListener {
       override def onLayoutChange(v: View, left: Int, top: Int, right: Int, bottom: Int, oldLeft: Int, oldTop: Int, oldRight: Int, oldBottom: Int): Unit = {
-        val assetId = AssetId(getArguments.getString(SingleImageCollectionFragment.ARG_ASSET_ID))
-        setAsset(assetId)
-        view.removeOnLayoutChangeListener(onLayoutChangeListener)
+        if (v.getWidth > 0) {
+          val assetId = AssetId(getArguments.getString(SingleImageCollectionFragment.ARG_ASSET_ID))
+          setAsset(assetId)
+          imageView.removeOnLayoutChangeListener(onLayoutChangeListener)
+        }
       }
     }
-    view.addOnLayoutChangeListener(onLayoutChangeListener)
+    imageView.addOnLayoutChangeListener(onLayoutChangeListener)
   }
 
   override def onBackPressed(): Boolean = true
 
-
-  private def loadBitmap(assetId: AssetId, width: Int)  = zms.flatMap { zms =>
-    zms.assetsStorage.signal(assetId).flatMap {
-      case data@AssetData.IsImage() => BitmapSignal(data, Single(width), zms.imageLoader, zms.imageCache)
-      case _ => Signal.empty[BitmapResult]
-    }.map{
-      case BitmapLoaded(bmp, _) => Option(bmp)
-      case _ => None
-    }
-  }
-
   def setAsset(assetId: AssetId): Unit = {
-    val assetSignal = assetsStorage.flatMap(_.signal(assetId))
     val imageView: TouchImageView = ViewUtils.getView(getView, R.id.tiv__image_view)
-    imageView.setImageBitmap(null)
-    imageView.setAlpha(0f)
-    assetSignal.flatMap(a => loadBitmap(a.id, getView.getWidth)).on(Threading.Ui) {
-      case Some(b) =>
-        imageView.setImageBitmap(b)
-        imageView.animate
-          .alpha(1f)
-          .setDuration(getResources.getInteger(R.integer.content__image__directly_final_duration))
-          .start()
-      case None =>
-    }
+    imageView.setImageDrawable(new ImageAssetDrawable(Signal(WireImage(assetId)), scaleType = ImageAssetDrawable.ScaleType.CenterInside))
   }
 }
 

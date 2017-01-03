@@ -144,6 +144,10 @@ class ImageAssetDrawable(
   }
 
   override def getOpacity: Int = PixelFormat.TRANSLUCENT
+
+  override def getIntrinsicHeight: Int = dims.currentValue.map(_.height).getOrElse(-1)
+
+  override def getIntrinsicWidth: Int = dims.currentValue.map(_.width).getOrElse(-1)
 }
 
 object ImageAssetDrawable {
