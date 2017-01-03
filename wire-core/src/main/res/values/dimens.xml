@@ -808,4 +808,6 @@
     <dimen name="prefs__username_change__content_height">140dp</dimen>
 
     <dimen name="collections__content_horizontal_padding">@dimen/wire__padding__20</dimen>
+    <dimen name="collections__header_height">32dp</dimen>
+    <dimen name="collections__image_padding">0.5dp</dimen>
 </resources>

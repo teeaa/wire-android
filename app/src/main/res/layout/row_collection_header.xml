@@ -21,7 +21,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
        xmlns:app="http://schemas.android.com/apk/res-auto"
        android:layout_width="match_parent"
-       android:layout_height="wrap_content"
+       android:layout_height="@dimen/collections__header_height"
        android:orientation="horizontal"
        android:background="?wireDividerColorSolid"
     >
@@ -29,38 +29,43 @@
     <com.waz.zclient.ui.text.TypefaceTextView
         android:id="@+id/ttv__collection_header__name"
         android:layout_width="wrap_content"
-        android:layout_height="32dp"
+        android:layout_height="match_parent"
         android:paddingStart="@dimen/wire__padding__12"
         android:gravity="center_vertical"
         android:textSize="@dimen/wire__text_size__small"
         app:font="@string/wire__typeface__bold"
+        android:textColor="?wireSecondaryTextColor"
         />
 
     <View
         android:layout_width="0dp"
         android:layout_height="32dp"
         android:layout_weight="1"
-        android:id="@+id/view"/>
+        android:id="@+id/view"
+        />
 
     <com.waz.zclient.ui.text.TypefaceTextView
         android:id="@+id/ttv__collection_header__count"
         android:layout_width="wrap_content"
-        android:layout_height="32dp"
+        android:layout_height="match_parent"
         android:gravity="center_vertical"
         android:textSize="@dimen/wire__text_size__small"
         app:font="@string/wire__typeface__thin"
-        android:visibility="visible"/>
+        android:visibility="visible"
+        android:textColor="?wirePrimaryTextColor"
+        />
 
     <com.waz.zclient.ui.text.GlyphTextView
         android:id="@+id/gtv__arrow"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:paddingEnd="@dimen/wire__padding__12"
         android:paddingStart="@dimen/wire__padding__12"
         android:gravity="center_vertical"
         android:text="@string/glyph__next"
-        android:textSize="@dimen/wire__text_size__small"
+        android:textSize="@dimen/wire__text_size__tiny"
         android:visibility="visible"
+        android:textColor="?wirePrimaryTextColor"
         />
 
 </LinearLayout>

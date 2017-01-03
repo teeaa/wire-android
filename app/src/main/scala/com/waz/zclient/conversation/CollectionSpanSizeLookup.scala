@@ -39,7 +39,7 @@ class CollectionSpanSizeLookup(val spanCount: Int, val adapter: CollectionAdapte
   def isLastBeforeHeader(position: Int): Boolean = {
     val headerId = adapter.getHeaderId(position)
     val nextPosition = position + 1
-    val res = nextPosition >= 0 && nextPosition < adapter.getItemCount && headerId != adapter.getHeaderId(nextPosition)
+    val res = nextPosition >= 0 && nextPosition < adapter.getItemCount && !headerId.equals(adapter.getHeaderId(nextPosition))
     res
   }
 

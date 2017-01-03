@@ -45,7 +45,7 @@ import com.waz.ZLog._
 import com.waz.api.Message
 import com.waz.model._
 import com.waz.threading.Threading
-import com.waz.utils.events.{EventContext, Signal}
+import com.waz.utils.events.{EventContext, Signal, SourceSignal}
 import com.waz.utils.returning
 import com.waz.zclient.conversation.CollectionAdapter._
 import com.waz.zclient.ui.text.GlyphTextView
@@ -69,6 +69,8 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
     *
     * I'm starting to prefer the second way, as it's a little bit more explicit as to what's happening. Both ways should be used cautiously!!
     */
+
+  setHasStableIds(true)
 
   val all = ctrler.messagesByType(CollectionController.All, 8)
   private var _all = Seq.empty[MessageData]
@@ -127,10 +129,10 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
 
   override def getItemCount: Int = {
     contentMode match {
-      case CollectionAdapter.VIEW_MODE_ALL => all.currentValue.map(_.size).getOrElse(0)
-      case CollectionAdapter.VIEW_MODE_FILES => files.currentValue.map(_.size).getOrElse(0)
-      case CollectionAdapter.VIEW_MODE_IMAGES => images.currentValue.map(_.size).getOrElse(0)
-      case CollectionAdapter.VIEW_MODE_LINKS => links.currentValue.map(_.size).getOrElse(0)
+      case CollectionAdapter.VIEW_MODE_ALL => _all.size
+      case CollectionAdapter.VIEW_MODE_FILES => _files.size
+      case CollectionAdapter.VIEW_MODE_IMAGES => _images.size
+      case CollectionAdapter.VIEW_MODE_LINKS => _links.size
       case _ => 0
     }
   }
@@ -138,7 +140,7 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
   override def getItemViewType(position: Int): Int = {
     contentMode match {
       case CollectionAdapter.VIEW_MODE_ALL => {
-        all.currentValue.getOrElse(Seq.empty)(position).msgType match {
+        _all(position).msgType match {
           case Message.Type.ANY_ASSET => CollectionAdapter.VIEW_TYPE_FILE
           case Message.Type.ASSET => CollectionAdapter.VIEW_TYPE_IMAGE
           case Message.Type.RICH_MEDIA if hasOpenGraphData(position) => CollectionAdapter.VIEW_TYPE_LINK_PREVIEW
@@ -155,19 +157,19 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
   }
 
   private def hasOpenGraphData(position: Int): Boolean = {
-    getItem(position).content.exists(_.openGraph.nonEmpty)
+    getItem(position).exists(_.content.exists(_.openGraph.nonEmpty))
   }
 
   override def onBindViewHolder(holder: ViewHolder, position: Int): Unit = {
     holder match {
-      case f: FileViewHolder => messageDataForPostion(position, _files).foreach(md => f.setMessageData(md))
-      case c: CollectionImageViewHolder => messageDataForPostion(position, _images).foreach(md => c.setMessageData(md, screenWidth / columns, ResourceUtils.getRandomAccentColor(context)))
-      case l: LinkPreviewViewHolder => messageDataForPostion(position, _links).foreach(md => l.setMessageData(md))
-      case l: SimpleLinkViewHolder => messageDataForPostion(position, _links).foreach(md => l.setMessageData(md))
+      case f: FileViewHolder => messageDataForPosition(position, _files).foreach(md => f.setMessageData(md))
+      case c: CollectionImageViewHolder => messageDataForPosition(position, _images).foreach(md => c.setMessageData(md, screenWidth / columns, ResourceUtils.getRandomAccentColor(context)))
+      case l: LinkPreviewViewHolder => messageDataForPosition(position, _links).foreach(md => l.setMessageData(md))
+      case l: SimpleLinkViewHolder => messageDataForPosition(position, _links).foreach(md => l.setMessageData(md))
     }
   }
 
-  private def messageDataForPostion(pos: Int, seq: Seq[MessageData]): Option[MessageData] = {
+  private def messageDataForPosition(pos: Int, seq: Seq[MessageData]): Option[MessageData] = {
     (if (contentMode == CollectionAdapter.VIEW_MODE_ALL) _all else seq).lift(pos)
   }
 
@@ -243,27 +245,27 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
     }
   }
 
-  def getItem(position: Int): MessageData = {
+  def getItem(position: Int): Option[MessageData] = {
     contentMode match {
-      case CollectionAdapter.VIEW_MODE_ALL => all.currentValue.getOrElse(Seq.empty)(position)
-      case CollectionAdapter.VIEW_MODE_IMAGES => images.currentValue.getOrElse(Seq.empty)(position)
-      case CollectionAdapter.VIEW_MODE_FILES => files.currentValue.getOrElse(Seq.empty)(position)
-      case CollectionAdapter.VIEW_MODE_LINKS => links.currentValue.getOrElse(Seq.empty)(position)
+      case CollectionAdapter.VIEW_MODE_ALL => _all.lift(position)
+      case CollectionAdapter.VIEW_MODE_IMAGES => _images.lift(position)
+      case CollectionAdapter.VIEW_MODE_FILES => _files.lift(position)
+      case CollectionAdapter.VIEW_MODE_LINKS => _links.lift(position)
     }
   }
 
   def getHeaderId(position: Int): HeaderId = {
     contentMode match {
       case CollectionAdapter.VIEW_MODE_ALL => {
-        all.currentValue.getOrElse(Seq.empty)(position).msgType match {
+        _all(position).msgType match {
           case Message.Type.ANY_ASSET => Header.mainFiles
           case Message.Type.ASSET => Header.mainImages
           case Message.Type.RICH_MEDIA => Header.mainLinks
           case _ => Header.mainImages
         }
       }
-      case _ => {
-        val time = getItem(position).time
+      case _ =>
+        val time = getItem(position).map(_.time).getOrElse(Instant.EPOCH)
         val now = LocalDateTime.ofInstant(Instant.now(), ZoneId.systemDefault()).toLocalDate
         val messageDate = LocalDateTime.ofInstant(time, ZoneId.systemDefault()).toLocalDate()
 
@@ -273,8 +275,6 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
           Header.subYesterday
         else
           HeaderId(HeaderType.MonthName, messageDate.getMonthValue, messageDate.getYear)
-
-      }
     }
   }
 
@@ -317,9 +317,9 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
 
   private def getHeaderCountText(headerId: HeaderId): String = {
     headerId match {
-      case HeaderId(HeaderType.Images, _, _) => "All " + images.currentValue.getOrElse(Seq()).length
-      case HeaderId(HeaderType.Files, _, _) => "All " + files.currentValue.getOrElse(Seq()).length
-      case HeaderId(HeaderType.Links, _, _) => "All " + links.currentValue.getOrElse(Seq()).length
+      case HeaderId(HeaderType.Images, _, _) => "All " + _images.size
+      case HeaderId(HeaderType.Files, _, _) => "All " + _files.size
+      case HeaderId(HeaderType.Links, _, _) => "All " + _links.size
       case _ => ""
     }
   }
@@ -327,10 +327,10 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
 
   def getItemPosition(messageData: MessageData): Int = {
     contentMode match {
-      case CollectionAdapter.VIEW_MODE_ALL => all.currentValue.map(_.indexOf(messageData)).getOrElse(-1)
-      case CollectionAdapter.VIEW_MODE_FILES => files.currentValue.map(_.indexOf(messageData)).getOrElse(-1)
-      case CollectionAdapter.VIEW_MODE_IMAGES => images.currentValue.map(_.indexOf(messageData)).getOrElse(-1)
-      case CollectionAdapter.VIEW_MODE_LINKS => links.currentValue.map(_.indexOf(messageData)).getOrElse(-1)
+      case CollectionAdapter.VIEW_MODE_ALL => _all.indexOf(messageData)
+      case CollectionAdapter.VIEW_MODE_FILES => _files.indexOf(messageData)
+      case CollectionAdapter.VIEW_MODE_IMAGES => _links.indexOf(messageData)
+      case CollectionAdapter.VIEW_MODE_LINKS => _links.indexOf(messageData)
       case _ => -1
     }
   }
@@ -338,17 +338,20 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
   def getPreviousItem(messageData: MessageData): Option[MessageData] = {
     getItemPosition(messageData) match {
       case 0 => None
-      case pos => Some(getItem(pos - 1))
+      case pos => getItem(pos - 1)
     }
   }
 
   def getNextItem(messageData: MessageData): Option[MessageData] = {
     getItemPosition(messageData) match {
       case pos if pos >= getItemCount - 1 => None
-      case pos => Some(getItem(pos + 1))
+      case pos => getItem(pos + 1)
     }
   }
 
+  override def getItemId(position: Int): Long = {
+    getItem(position).map(_.id.str.hashCode).getOrElse(0).toLong
+  }
 }
 
 case class HeaderId(headerType:Int, month: Int = 0, year: Int = 0)

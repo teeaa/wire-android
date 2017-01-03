@@ -18,21 +18,15 @@
 package com.waz.zclient.views
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.support.v7.widget.RecyclerView
 import android.util.AttributeSet
 import android.view.View.OnClickListener
 import android.view.{HapticFeedbackConstants, LayoutInflater}
 import android.widget.{FrameLayout, LinearLayout, TextView}
-import com.waz.bitmap.BitmapUtils
 import com.waz.model._
 import com.waz.service.ZMessaging
-import com.waz.service.assets.AssetService.BitmapResult
-import com.waz.service.assets.AssetService.BitmapResult.BitmapLoaded
-import com.waz.service.images.BitmapSignal
 import com.waz.service.messages.MessageAndLikes
 import com.waz.threading.Threading
-import com.waz.ui.MemoryImageCache.BitmapRequest.Single
 import com.waz.utils.events.{EventContext, Signal, SourceSignal}
 import com.waz.zclient.messages.MessageView.MsgBindOptions
 import com.waz.zclient.messages.MessageViewPart
@@ -94,6 +88,10 @@ object CollectionNormalItemView{
 }
 
 class CollectionImageView(context: Context) extends AspectRatioImageView(context) with CollectionItemView{
+  val padding = getResources.getDimensionPixelSize(R.dimen.collections__image_padding)
+  setCropToPadding(true)
+  setPadding(padding, padding, padding, padding)
+
   messageData.on(Threading.Ui) { md =>
     val imageDrawable = new ImageAssetDrawable(Signal(WireImage(md.assetId)), scaleType = ImageAssetDrawable.ScaleType.CenterCrop)
     setImageDrawable(imageDrawable)
