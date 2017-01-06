@@ -20,9 +20,9 @@ package com.waz.zclient.conversation
 import android.content.Context
 import android.os.Bundle
 import android.support.v4.app.FragmentManager
-import android.support.v7.widget.{GridLayoutManager, LinearLayoutManager, RecyclerView, Toolbar}
-import android.view.View.{OnClickListener, OnTouchListener}
-import android.view.{LayoutInflater, MotionEvent, View, ViewGroup}
+import android.support.v7.widget.Toolbar
+import android.view.View.OnClickListener
+import android.view.{LayoutInflater, View, ViewGroup}
 import android.widget.TextView
 import com.waz.ZLog._
 import com.waz.api.Message
@@ -30,8 +30,9 @@ import com.waz.model.{AssetId, MessageData}
 import com.waz.threading.Threading
 import com.waz.utils.events.Signal
 import com.waz.zclient.controllers.collections.CollectionsObserver
+import com.waz.zclient.conversation.CollectionAdapter.AdapterState
+import com.waz.zclient.conversation.CollectionController._
 import com.waz.zclient.pages.BaseFragment
-import com.waz.zclient.pages.main.conversation.collections.CollectionItemDecorator
 import com.waz.zclient.utils.ViewUtils
 import com.waz.zclient.{FragmentHelper, OnBackPressedListener, R}
 import org.threeten.bp.{LocalDateTime, ZoneId}
@@ -54,6 +55,7 @@ class CollectionFragment extends BaseFragment[CollectionFragment.Container] with
 
   override def onStop(): Unit = {
     super.onStop()
+    if (adapter != null) adapter.closeCursors()
     controller.removeObserver(this)
   }
 
@@ -72,10 +74,10 @@ class CollectionFragment extends BaseFragment[CollectionFragment.Container] with
     }
   }
 
-  private def textIdForContentMode(contentMode: Int) = contentMode match {
-    case CollectionAdapter.VIEW_MODE_IMAGES => R.string.collection_header_pictures
-    case CollectionAdapter.VIEW_MODE_FILES => R.string.collection_header_files
-    case CollectionAdapter.VIEW_MODE_LINKS => R.string.collection_header_links
+  private def textIdForContentMode(contentType: ContentType) = contentType match {
+    case Images => R.string.collection_header_pictures
+    case Files => R.string.collection_header_files
+    case Links => R.string.collection_header_links
     case _ => R.string.collection_header_all
   }
 
@@ -83,7 +85,7 @@ class CollectionFragment extends BaseFragment[CollectionFragment.Container] with
     val view = inflater.inflate(R.layout.fragment_collection, container, false)
     val name: TextView  = ViewUtils.getView(view, R.id.tv__collection_toolbar__name)
     val contentView: TextView = ViewUtils.getView(view, R.id.tv__collection_toolbar__content)
-    val recyclerView: RecyclerView = ViewUtils.getView(view, R.id.rv__collection)
+    val recyclerView: CollectionRecyclerView = ViewUtils.getView(view, R.id.rv__collection)
     val emptyView: View = ViewUtils.getView(view, R.id.ll__collection__empty)
     emptyView.setVisibility(View.GONE)
 
@@ -94,62 +96,24 @@ class CollectionFragment extends BaseFragment[CollectionFragment.Container] with
 
     val columns = 4
     adapter = new CollectionAdapter(ViewUtils.getRealDisplayWidth(context), columns, controller)
+    recyclerView.init(adapter)
 
     Signal(adapter.adapterState, controller.focusedItem, controller.conversationName).on(Threading.Ui) {
-      case ((_, _), Some(messageData), conversationName) =>
+      case (AdapterState(_, _, _), Some(messageData), conversationName) =>
         name.setText(LocalDateTime.ofInstant(messageData.time, ZoneId.systemDefault()).toLocalDate.toString)
         contentView.setText(conversationName)
-      case ((contentMode, 0), None, conversationName) =>
+      case (AdapterState(contentMode, 0, false), None, conversationName) =>
         emptyView.setVisibility(View.VISIBLE)
         recyclerView.setVisibility(View.GONE)
         contentView.setText(textIdForContentMode(contentMode))
         name.setText(conversationName)
-      case ((contentMode, _), None, conversationName) =>
+      case (AdapterState(contentMode, _, _), None, conversationName) =>
         emptyView.setVisibility(View.GONE)
         recyclerView.setVisibility(View.VISIBLE)
         contentView.setText(textIdForContentMode(contentMode))
         name.setText(conversationName)
       case _ =>
     }
-
-    val collectionItemDecorator = new CollectionItemDecorator(adapter, columns)
-    recyclerView.setAdapter(adapter)
-    recyclerView.setOnTouchListener(new OnTouchListener {
-      var headerDown = false
-
-      override def onTouch(v: View, event: MotionEvent): Boolean = {
-        val x = Math.round(event.getX)
-        val y = Math.round(event.getY)
-        event.getAction match {
-          case MotionEvent.ACTION_DOWN =>
-            if (collectionItemDecorator.getHeaderClicked(x, y) < 0) {
-              headerDown = false
-            } else {
-              headerDown = true
-            }
-            false
-          case MotionEvent.ACTION_MOVE =>
-            if (event.getHistorySize > 0) {
-              val deltaX = event.getHistoricalX(0) - x
-              val deltaY = event.getHistoricalY(0) - y
-              if (Math.abs(deltaY) + Math.abs(deltaX) > CollectionFragment.MAX_DELTA_TOUCH) {
-                headerDown = false
-              }
-            }
-            false
-          case MotionEvent.ACTION_UP =>
-            if (!headerDown) {
-              return false
-            }
-            adapter.onHeaderClicked(collectionItemDecorator.getHeaderClicked(x, y))
-          case _ => false;
-        }
-      }
-    })
-    recyclerView.addItemDecoration(collectionItemDecorator)
-    val layoutManager = new GridLayoutManager(context, columns, LinearLayoutManager.VERTICAL, false)
-    layoutManager.setSpanSizeLookup(new CollectionSpanSizeLookup(columns, adapter))
-    recyclerView.setLayoutManager(layoutManager)
 
     val toolbar: Toolbar = ViewUtils.getView(view, R.id.t_toolbar)
     toolbar.setNavigationOnClickListener(new OnClickListener {
@@ -177,13 +141,13 @@ class CollectionFragment extends BaseFragment[CollectionFragment.Container] with
 
   override def previousItemRequested(): Unit =
     controller.focusedItem mutate {
-      case Some(messageData) => Some(adapter.getPreviousItem(messageData).getOrElse(messageData))
+      case Some(messageData) => None
       case _ => None
     }
 
   override def nextItemRequested(): Unit =
     controller.focusedItem mutate {
-      case Some(messageData) => Some(adapter.getNextItem(messageData).getOrElse(messageData))
+      case Some(messageData) => None
       case _ => None
     }
 

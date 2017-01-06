@@ -38,7 +38,7 @@ import scala.collection.mutable.ArrayBuffer
   * RecyclerView only cares about notifications for visible elements, so it's enough to
   * keep a small window around current position, and ignore changes outside of it.
   */
-class IndexWindow(cursor: RecyclerCursor, notifier: RecyclerNotifier) {
+class IndexWindow(cursor: RecyclerCursor, notifier: RecyclerNotifier, size: Int = 100) {
   import IndexWindow._
 
   private val ord = implicitly[Ordering[Entry]]
@@ -95,7 +95,7 @@ class IndexWindow(cursor: RecyclerCursor, notifier: RecyclerNotifier) {
     * there is no intended use case for moving of message.
     */
   def cursorChanged(c: MessagesCursor) = {
-    val items = if (cursor.count > 0) c.getEntries(offset, math.min(cursor.count - offset, 100)).toIndexedSeq else IndexedSeq.empty
+    val items = if (c.size > 0) c.getEntries(offset, math.min(cursor.count - offset, 100)).toIndexedSeq else IndexedSeq[Entry]()
     val prevCount = totalCount
     val change = diff(data, items).result
     data = items

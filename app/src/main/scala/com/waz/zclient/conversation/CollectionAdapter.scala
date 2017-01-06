@@ -42,12 +42,17 @@ import android.view.View.OnClickListener
 import android.view.{LayoutInflater, View, ViewGroup}
 import android.widget.{LinearLayout, TextView}
 import com.waz.ZLog._
-import com.waz.api.Message
+import com.waz.api.{Message, MessageFilter}
 import com.waz.model._
+import com.waz.service.ZMessaging
 import com.waz.threading.Threading
-import com.waz.utils.events.{EventContext, Signal, SourceSignal}
+import com.waz.utils.events.{EventContext, Signal}
 import com.waz.utils.returning
+import com.waz.zclient.controllers.global.SelectionController
 import com.waz.zclient.conversation.CollectionAdapter._
+import com.waz.zclient.conversation.CollectionController.{ContentType, _}
+import com.waz.zclient.messages.RecyclerCursor
+import com.waz.zclient.messages.RecyclerCursor.RecyclerNotifier
 import com.waz.zclient.ui.text.GlyphTextView
 import com.waz.zclient.ui.utils.ResourceUtils
 import com.waz.zclient.utils.ViewUtils
@@ -57,103 +62,77 @@ import org.threeten.bp._
 import org.threeten.bp.temporal.ChronoUnit
 
 //For now just handling images
-class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsController)(implicit context: Context, injector: Injector, eventContext: EventContext) extends RecyclerView.Adapter[ViewHolder] with Injectable {
+class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsController)(implicit context: Context, injector: Injector, eventContext: EventContext) extends RecyclerView.Adapter[ViewHolder] with Injectable { adapter =>
 
   private implicit val tag: LogTag = logTagFor[CollectionAdapter]
 
-  /**
-    * If signals don't have any subscribers, then by default they don't bother computing their values whenever changes are published to them,
-    * until they get their first subscriber. If we then try to call Signal#getCurrentValue on such a signal, we'll probably get None or something undefined.
-    * There are two ways around this, either call Signal#disableAutoWiring on any signals you wish to be able to access, or have a temporary var that keeps
-    * track of the current value, and set listeners to update that var.
-    *
-    * I'm starting to prefer the second way, as it's a little bit more explicit as to what's happening. Both ways should be used cautiously!!
-    */
+  private val zms = inject[Signal[ZMessaging]]
+  private val selectedConversation = inject[SelectionController].selectedConv
 
-  setHasStableIds(true)
+  val contentMode = Signal[ContentType](AllContent)
+  //contentMode.disableAutowiring()
 
-  val all = ctrler.messagesByType(CollectionController.All, 8)
-  private var _all = Seq.empty[MessageData]
-  all(_all = _)
-
-  val images = ctrler.messagesByType(CollectionController.Images)
-  private var _images = Seq.empty[MessageData]
-  images(_images = _)
-
-  val files = ctrler.messagesByType(CollectionController.Files)
-  private var _files = Seq.empty[MessageData]
-  files(_files = _)
-
-  val links = ctrler.messagesByType(CollectionController.Links)
-  private var _links = Seq.empty[MessageData]
-  links(_links = _)
-
-  var contentMode = CollectionAdapter.VIEW_MODE_ALL
-
-  images.onChanged.on(Threading.Ui) { _ =>
-    contentMode match {
-      case CollectionAdapter.VIEW_MODE_IMAGES => notifyDataSetChanged()
-      case _ =>
-    }
-  }
-
-  files.onChanged.on(Threading.Ui) { _ =>
-    contentMode match {
-      case CollectionAdapter.VIEW_MODE_FILES => notifyDataSetChanged()
-      case _ =>
-    }
-  }
-
-  links.onChanged.on(Threading.Ui) { _ =>
-    contentMode match {
-      case CollectionAdapter.VIEW_MODE_LINKS => notifyDataSetChanged()
-      case _ =>
-    }
-  }
-
-  all.onChanged.on(Threading.Ui) { _ =>
-    contentMode match {
-      case CollectionAdapter.VIEW_MODE_ALL => notifyDataSetChanged()
-      case _ =>
-    }
-  }
+  val conv = for {
+    zs <- zms
+    convId <- selectedConversation
+    conv <- Signal future zs.convsStorage.get(convId)
+  } yield conv
 
   var header: CollectionHeaderLinearLayout = null
-  val adapterState = Signal[(Int, Int)](contentMode, -1)
 
+  val adapterState = Signal[AdapterState](AdapterState(contentMode.currentValue.get, 0, loading = true))
+
+  val collectionCursors = scala.collection.mutable.Map[ContentType, Option[RecyclerCursor]](
+    AllContent -> None,
+    Images -> None,
+    Files -> None,
+    Links -> None)
+
+  def cursorForContentMode(contentType: ContentType): Unit ={
+    val notifier = new CollectionRecyclerNotifier(contentType, adapter)
+    val cursor = for {
+      zs <- zms
+      Some(c) <- conv
+      rc <- Signal(new RecyclerCursor(c.id, zs, notifier, Some(MessageFilter(Some(contentType.msgTypes), if (contentType == AllContent) Some(8) else None))))
+      _ <- rc.countSignal
+    } yield rc
+
+    verbose(s"Started loading for: ${contentType.toString}")
+    cursor.on(Threading.Ui) { c =>
+      if (!collectionCursors(contentType).contains(c)) {
+        collectionCursors(contentType).foreach(_.close())
+        collectionCursors(contentType) = Some(c)
+        verbose(s"Cursor loaded for: ${contentType.toString}, current mode is: ${contentMode.currentValue.toString}")
+        notifier.notifyDataSetChanged()
+      }
+    }
+  }
+
+  collectionCursors.foreach(t => cursorForContentMode(t._1))
+
+  def messages = contentMode.currentValue.fold(Option.empty[RecyclerCursor])(collectionCursors(_))
+
+  contentMode.on(Threading.Ui){ cm =>
+    notifyDataSetChanged()
+  }
+
+  setHasStableIds(true)
   registerAdapterDataObserver(new AdapterDataObserver {
     override def onChanged(): Unit = {
-      adapterState ! (contentMode, getItemCount)
+      adapterState ! AdapterState(contentMode.currentValue.get, getItemCount, messages.isEmpty)
     }
   })
 
-  override def getItemCount: Int = {
-    contentMode match {
-      case CollectionAdapter.VIEW_MODE_ALL => _all.size
-      case CollectionAdapter.VIEW_MODE_FILES => _files.size
-      case CollectionAdapter.VIEW_MODE_IMAGES => _images.size
-      case CollectionAdapter.VIEW_MODE_LINKS => _links.size
-      case _ => 0
-    }
-  }
+  override def getItemCount: Int = messages.fold(0)(_.count)
 
   override def getItemViewType(position: Int): Int = {
-    contentMode match {
-      case CollectionAdapter.VIEW_MODE_ALL => {
-        _all(position).msgType match {
-          case Message.Type.ANY_ASSET => CollectionAdapter.VIEW_TYPE_FILE
-          case Message.Type.ASSET => CollectionAdapter.VIEW_TYPE_IMAGE
-          case Message.Type.RICH_MEDIA if hasOpenGraphData(position) => CollectionAdapter.VIEW_TYPE_LINK_PREVIEW
-          case Message.Type.RICH_MEDIA => CollectionAdapter.VIEW_TYPE_SIMPLE_LINK
-          case _ => CollectionAdapter.VIEW_TYPE_FILE
-        }
-      }
-      case CollectionAdapter.VIEW_MODE_FILES => CollectionAdapter.VIEW_TYPE_FILE
-      case CollectionAdapter.VIEW_MODE_IMAGES => CollectionAdapter.VIEW_TYPE_IMAGE
-      case CollectionAdapter.VIEW_MODE_LINKS if hasOpenGraphData(position) => CollectionAdapter.VIEW_TYPE_LINK_PREVIEW
-      case CollectionAdapter.VIEW_MODE_LINKS => CollectionAdapter.VIEW_TYPE_SIMPLE_LINK
-      case _ => CollectionAdapter.VIEW_TYPE_FILE
-    }
+    getItem(position).fold(CollectionAdapter.VIEW_TYPE_DEFAULT)(_.msgType match {
+      case Message.Type.ANY_ASSET => CollectionAdapter.VIEW_TYPE_FILE
+      case Message.Type.ASSET => CollectionAdapter.VIEW_TYPE_IMAGE
+      case Message.Type.RICH_MEDIA if hasOpenGraphData(position) => CollectionAdapter.VIEW_TYPE_LINK_PREVIEW
+      case Message.Type.RICH_MEDIA => CollectionAdapter.VIEW_TYPE_SIMPLE_LINK
+      case _ => CollectionAdapter.VIEW_TYPE_DEFAULT
+    })
   }
 
   private def hasOpenGraphData(position: Int): Boolean = {
@@ -161,23 +140,20 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
   }
 
   override def onBindViewHolder(holder: ViewHolder, position: Int): Unit = {
-    holder match {
-      case f: FileViewHolder => messageDataForPosition(position, _files).foreach(md => f.setMessageData(md))
-      case c: CollectionImageViewHolder => messageDataForPosition(position, _images).foreach(md => c.setMessageData(md, screenWidth / columns, ResourceUtils.getRandomAccentColor(context)))
-      case l: LinkPreviewViewHolder => messageDataForPosition(position, _links).foreach(md => l.setMessageData(md))
-      case l: SimpleLinkViewHolder => messageDataForPosition(position, _links).foreach(md => l.setMessageData(md))
+    getItem(position).foreach{ md =>
+      holder match {
+        case f: FileViewHolder => f.setMessageData(md)
+        case c: CollectionImageViewHolder => c.setMessageData(md, screenWidth / columns, ResourceUtils.getRandomAccentColor(context))
+        case l: LinkPreviewViewHolder => l.setMessageData(md)
+        case l: SimpleLinkViewHolder => l.setMessageData(md)
+      }
     }
   }
 
-  private def messageDataForPosition(pos: Int, seq: Seq[MessageData]): Option[MessageData] = {
-    (if (contentMode == CollectionAdapter.VIEW_MODE_ALL) _all else seq).lift(pos)
-  }
-
-  def onBackPressed(): Boolean = contentMode match {
-    case CollectionAdapter.VIEW_MODE_ALL => false
+  def onBackPressed(): Boolean = contentMode.currentValue.get match {
+    case AllContent => false
     case _ =>
-      contentMode = CollectionAdapter.VIEW_MODE_ALL
-      notifyDataSetChanged()
+      contentMode ! AllContent
       true
   }
 
@@ -185,23 +161,17 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
     if (position < 0) {
       false
     } else {
-      val newMode = contentMode match {
-        case CollectionAdapter.VIEW_MODE_ALL => {
+      contentMode.mutate {
+        case AllContent =>
           getHeaderId(position) match {
-            case Header.mainLinks => CollectionAdapter.VIEW_MODE_LINKS
-            case Header.mainImages => CollectionAdapter.VIEW_MODE_IMAGES
-            case Header.mainFiles => CollectionAdapter.VIEW_MODE_FILES
+            case Header.mainLinks => Links
+            case Header.mainImages => Images
+            case Header.mainFiles => Files
+            case _ => AllContent
           }
-        }
-        case _ => contentMode
+        case currentMode => currentMode
       }
-      if (newMode != contentMode) {
-        contentMode = newMode
-        notifyDataSetChanged()
-        true
-      } else {
-        false
-      }
+      true
     }
   }
 
@@ -237,31 +207,37 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
   }
 
   def isFullSpan(position: Int): Boolean = {
-    getItemViewType(position) match {
-      case CollectionAdapter.VIEW_TYPE_FILE => true
-      case CollectionAdapter.VIEW_TYPE_IMAGE => false
-      case CollectionAdapter.VIEW_TYPE_LINK_PREVIEW => true
-      case CollectionAdapter.VIEW_TYPE_SIMPLE_LINK => true
+    contentMode.currentValue.get match {
+      case AllContent =>
+        getItemViewType(position) match {
+          case CollectionAdapter.VIEW_TYPE_FILE => true
+          case CollectionAdapter.VIEW_TYPE_IMAGE => false
+          case CollectionAdapter.VIEW_TYPE_LINK_PREVIEW => true
+          case CollectionAdapter.VIEW_TYPE_SIMPLE_LINK => true
+        }
+      case Images =>
+        false
+      case _ =>
+        true
     }
   }
 
   def getItem(position: Int): Option[MessageData] = {
-    contentMode match {
-      case CollectionAdapter.VIEW_MODE_ALL => _all.lift(position)
-      case CollectionAdapter.VIEW_MODE_IMAGES => _images.lift(position)
-      case CollectionAdapter.VIEW_MODE_FILES => _files.lift(position)
-      case CollectionAdapter.VIEW_MODE_LINKS => _links.lift(position)
-    }
+    messages.fold(Option.empty[MessageData])(cursor =>
+      if (cursor.count > position)
+        Some(cursor.apply(position).message)
+      else
+        None)
   }
 
   def getHeaderId(position: Int): HeaderId = {
-    contentMode match {
-      case CollectionAdapter.VIEW_MODE_ALL => {
-        _all(position).msgType match {
+    contentMode.currentValue.get match {
+      case AllContent => {
+        getItem(position).fold(Message.Type.UNKNOWN)(_.msgType) match {
           case Message.Type.ANY_ASSET => Header.mainFiles
           case Message.Type.ASSET => Header.mainImages
           case Message.Type.RICH_MEDIA => Header.mainLinks
-          case _ => Header.mainImages
+          case _ => Header.invalid
         }
       }
       case _ =>
@@ -288,7 +264,7 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
 
     header.nameView.setText(getHeaderText(getHeaderId(position)))
     header.countView.setText(getHeaderCountText(getHeaderId(position)))
-    if (contentMode == CollectionAdapter.VIEW_MODE_ALL) {
+    if (contentMode.currentValue.contains(AllContent)) {
       header.arrowView.setVisibility(View.VISIBLE)
     } else {
       header.arrowView.setVisibility(View.GONE)
@@ -317,40 +293,19 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
 
   private def getHeaderCountText(headerId: HeaderId): String = {
     headerId match {
-      case HeaderId(HeaderType.Images, _, _) => "All " + _images.size
-      case HeaderId(HeaderType.Files, _, _) => "All " + _files.size
-      case HeaderId(HeaderType.Links, _, _) => "All " + _links.size
+      case HeaderId(HeaderType.Images, _, _) => "All " + collectionCursors(Images).fold(0)(_.count)
+      case HeaderId(HeaderType.Files, _, _) => "All " + collectionCursors(Files).fold(0)(_.count)
+      case HeaderId(HeaderType.Links, _, _) => "All " + collectionCursors(Links).fold(0)(_.count)
       case _ => ""
-    }
-  }
-
-
-  def getItemPosition(messageData: MessageData): Int = {
-    contentMode match {
-      case CollectionAdapter.VIEW_MODE_ALL => _all.indexOf(messageData)
-      case CollectionAdapter.VIEW_MODE_FILES => _files.indexOf(messageData)
-      case CollectionAdapter.VIEW_MODE_IMAGES => _links.indexOf(messageData)
-      case CollectionAdapter.VIEW_MODE_LINKS => _links.indexOf(messageData)
-      case _ => -1
-    }
-  }
-
-  def getPreviousItem(messageData: MessageData): Option[MessageData] = {
-    getItemPosition(messageData) match {
-      case 0 => None
-      case pos => getItem(pos - 1)
-    }
-  }
-
-  def getNextItem(messageData: MessageData): Option[MessageData] = {
-    getItemPosition(messageData) match {
-      case pos if pos >= getItemCount - 1 => None
-      case pos => getItem(pos + 1)
     }
   }
 
   override def getItemId(position: Int): Long = {
     getItem(position).map(_.id.str.hashCode).getOrElse(0).toLong
+  }
+
+  def closeCursors(): Unit ={
+    collectionCursors.foreach(_._2.foreach(_.close()))
   }
 }
 
@@ -376,15 +331,13 @@ object Header {
 
 object CollectionAdapter {
 
-  val VIEW_MODE_ALL: Int = 0
-  val VIEW_MODE_IMAGES: Int = 1
-  val VIEW_MODE_FILES: Int = 2
-  val VIEW_MODE_LINKS: Int = 3
+  private implicit val tag: LogTag = logTagFor[CollectionAdapter]
 
   val VIEW_TYPE_IMAGE = 0
   val VIEW_TYPE_FILE = 1
   val VIEW_TYPE_LINK_PREVIEW = 2
   val VIEW_TYPE_SIMPLE_LINK = 3
+  val VIEW_TYPE_DEFAULT = VIEW_TYPE_FILE
 
   case class CollectionHeaderLinearLayout(context: Context, attrs: AttributeSet, defStyleAttr: Int) extends LinearLayout(context, attrs, defStyleAttr) {
 
@@ -399,5 +352,33 @@ object CollectionAdapter {
     LayoutInflater.from(context).inflate(R.layout.row_collection_header, this, true)
   }
 
+  class CollectionRecyclerNotifier(contentType: ContentType, adapter: CollectionAdapter) extends RecyclerNotifier{
+    override def notifyDataSetChanged(): Unit = {
+      if (adapter.contentMode.currentValue.contains(contentType)) {
+          verbose(s"Will notifyDataSetChanged. contentType: ${contentType.toString}, current mode is: ${adapter.contentMode.currentValue.toString}")
+          adapter.notifyDataSetChanged()
+      }
+    }
 
+    override def notifyItemRangeInserted(index: Int, length: Int): Unit = {
+      if (adapter.contentMode.currentValue.contains(contentType)) {
+        verbose(s"Will notifyItemRangeInserted. contentType: ${contentType.toString}, current mode is: ${adapter.contentMode.currentValue.toString}")
+        adapter.notifyItemRangeInserted(index, length)
+      }
+    }
+
+    override def notifyItemRangeChanged(index: Int, length: Int): Unit =
+      if (adapter.contentMode.currentValue.contains(contentType)) {
+        verbose(s"Will notifyItemRangeChanged. contentType: ${contentType.toString}, current mode is: ${adapter.contentMode.currentValue.toString}")
+        adapter.notifyItemRangeChanged(index, length)
+      }
+
+    override def notifyItemRangeRemoved(pos: Int, count: Int): Unit =
+      if (adapter.contentMode.currentValue.contains(contentType)) {
+        verbose(s"Will notifyItemRangeRemoved. contentType: ${contentType.toString}, current mode is: ${adapter.contentMode.currentValue.toString}")
+        adapter.notifyItemRangeRemoved(pos, count)
+      }
+  }
+
+  case class AdapterState(contentType: ContentType, itemCount: Int, loading: Boolean)
 }

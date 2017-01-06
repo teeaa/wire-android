@@ -19,6 +19,7 @@ package com.waz.zclient.messages
 
 import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
+import com.waz.api.MessageFilter
 import com.waz.content.ConvMessagesIndex._
 import com.waz.content.{ConvMessagesIndex, MessagesCursor}
 import com.waz.model.ConvId
@@ -31,7 +32,7 @@ import com.waz.zclient.messages.RecyclerCursor.RecyclerNotifier
 import com.waz.zclient.{Injectable, Injector}
 import org.threeten.bp.Instant
 
-class RecyclerCursor(val conv: ConvId, zms: ZMessaging, adapter: RecyclerNotifier)(implicit inj: Injector, ev: EventContext) extends Injectable { self =>
+class RecyclerCursor(val conv: ConvId, zms: ZMessaging, val adapter: RecyclerNotifier, messageFilter: Option[MessageFilter] = None)(implicit inj: Injector, ev: EventContext) extends Injectable { self =>
 
   import com.waz.threading.Threading.Implicits.Ui
 
@@ -40,9 +41,9 @@ class RecyclerCursor(val conv: ConvId, zms: ZMessaging, adapter: RecyclerNotifie
   val storage = zms.messagesStorage
   val likes = zms.reactionsStorage
 
-  val index = storage.msgsIndex(conv)
+  val index = messageFilter.fold(storage.msgsIndex(conv))(f => storage.msgsFilteredIndex(conv, f))
   val lastReadTime = Signal.future(index).flatMap(_.signals.lastReadTime)
-  val countSignal = Signal[Int](0)
+  val countSignal = Signal[Int]()
 
   private val window = new IndexWindow(this, adapter)
   private var closed = false

@@ -27,12 +27,14 @@ import com.waz.model._
 import com.waz.service.ZMessaging
 import com.waz.service.messages.MessageAndLikes
 import com.waz.threading.Threading
+import com.waz.ui.MemoryImageCache.BitmapRequest
 import com.waz.utils.events.{EventContext, Signal, SourceSignal}
 import com.waz.zclient.messages.MessageView.MsgBindOptions
 import com.waz.zclient.messages.MessageViewPart
 import com.waz.zclient.messages.controllers.MessageActionsController
 import com.waz.zclient.pages.main.conversation.views.AspectRatioImageView
 import com.waz.zclient.utils.{ViewUtils, _}
+import com.waz.zclient.views.ImageAssetDrawable.RequestBuilder
 import com.waz.zclient.views.ImageController.WireImage
 import com.waz.zclient.{R, ViewHelper}
 import org.threeten.bp.{LocalDateTime, ZoneId}

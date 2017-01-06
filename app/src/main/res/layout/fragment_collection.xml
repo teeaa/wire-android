@@ -76,7 +76,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <android.support.v7.widget.RecyclerView
+        <com.waz.zclient.conversation.CollectionRecyclerView
             android:id="@+id/rv__collection"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
