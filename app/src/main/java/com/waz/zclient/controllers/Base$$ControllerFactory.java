@@ -633,7 +633,7 @@ public abstract class Base$$ControllerFactory implements IControllerFactory {
     public ICollectionsController getCollectionsController() {
         verifyLifecycle();
         if (collectionsController == null) {
-            collectionsController = new CollectionController(((WireContext)this.context).injector());
+            collectionsController = new CollectionController(((WireContext) this.context).injector());
         }
         return collectionsController;
     }

@@ -219,6 +219,11 @@
     <issue id="UnusedResources" severity="error">
         <ignore path="src/main/res/layout/calling*"/>
         <ignore path="src/main/res/layout/message_*"/>
+        <ignore path="src/main/res/layout/collection_*"/>
+        <ignore path="src/main/res/layout/fragment_collection*"/>
+        <ignore path="src/main/res/layout/fragment_single_image_collections.xml"/>
+        <ignore path="src/main/res/layout/row_collection*"/>
+        <ignore path="src/main/res/layout/row_selectable_conversation.xml"/>
         <ignore path="src/main/res/layout/system_message_content.xml"/>
         <ignore path="*pin_bg.xml*"/>
 
@@ -237,6 +242,11 @@
         <ignore path="src/main/res/layout/calling*"/>
         <ignore path="src/main/res/layout/message_*"/>
         <ignore path="src/main/res/layout/system_message_content.xml"/>
+        <ignore path="src/main/res/layout/collection*"/>
+        <ignore path="src/main/res/layout/fragment_collection*"/>
+        <ignore path="src/main/res/layout/fragment_single_image_collections.xml"/>
+        <ignore path="src/main/res/layout/row_collection*"/>
+        <ignore path="src/main/res/layout/row_selectable_conversation.xml"/>
     </issue>
     <issue id="EnforceUTF8" severity="error" />
     <issue id="ViewHolder" severity="error" />

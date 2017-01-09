@@ -21,26 +21,18 @@ import java.util
 import java.util.concurrent.CopyOnWriteArraySet
 
 import com.waz.ZLog._
-import com.waz.api.{IConversation, Message, MessageFilter}
-import com.waz.content.MessagesStorage
-import com.waz.model.MessageData.MessageDataDao
+import com.waz.api.{IConversation, Message, TypeFilter}
 import com.waz.model._
 import com.waz.service.ZMessaging
-import com.waz.threading.{SerialDispatchQueue, Threading}
+import com.waz.threading.SerialDispatchQueue
 import com.waz.utils.events.{Signal, SourceSignal}
 import com.waz.zclient.controllers.collections.CollectionsObserver
-import com.waz.zclient.conversation.CollectionController._
-import com.waz.zclient.messages.RecyclerCursor
 import com.waz.zclient.{Injectable, Injector}
-
-import scala.concurrent.Future
 
 trait ICollectionsController {
 
   val focusedItem: SourceSignal[Option[MessageData]]
   val conversationName: Signal[String]
-
-  def messagesByType(`type`: CollectionController.ContentType, limit: Int = 0): Signal[Seq[MessageData]]
 
   def openCollection(): Unit
 
@@ -81,11 +73,6 @@ class CollectionController(implicit injector: Injector) extends Injectable with 
 
   override val focusedItem: SourceSignal[Option[MessageData]] = Signal(None)
 
-  //TODO - consider making messageType a Seq and passing that logic down to SE - (if we don't use a cursor)
-  private def loadMessagesByType(conv: ConvId, storage: MessagesStorage, limit: Int, messageType: Message.Type) = {
-    storage.find(m => m.convId == conv && m.msgType == messageType && !m.isEphemeral, MessageDataDao.findByType(conv, messageType)(_), identity).map(results => results.sortBy(_.time).reverse.take(if (limit > 0) limit else results.length))
-  }
-
   private def performOnObservers(func: (CollectionsObserver) => Unit) = {
     val collectionObservers: CopyOnWriteArraySet[CollectionsObserver] = new CopyOnWriteArraySet[CollectionsObserver](observers)
     import scala.collection.JavaConversions._
@@ -93,8 +80,6 @@ class CollectionController(implicit injector: Injector) extends Injectable with 
       func(observer)
     }
   }
-
-  override def messagesByType(`type`: ContentType, limit: Int): Signal[Seq[MessageData]] = Signal.empty
 
   override def openCollection = performOnObservers(_.openCollection())
 
@@ -118,8 +103,6 @@ class StubCollectionController extends ICollectionsController{
   override val focusedItem: SourceSignal[Option[MessageData]] = Signal(None)
   override val conversationName: Signal[String] = Signal("")
 
-  override def messagesByType(`type`: ContentType, limit: Int): Signal[Seq[MessageData]] = Signal(Seq())
-
   override def openCollection(): Unit = {}
 
   override def closeCollection(): Unit = {}
@@ -141,23 +124,32 @@ object CollectionController {
 
   trait ContentType {
     val msgTypes: Seq[Message.Type]
+    val typeFilter: Seq[TypeFilter]
   }
 
   case object Links extends ContentType {
     override val msgTypes = Seq(Message.Type.RICH_MEDIA)
+    override val typeFilter: Seq[TypeFilter] = Seq(TypeFilter(Message.Type.RICH_MEDIA, None))
   }
 
   case object Images extends ContentType {
     override val msgTypes = Seq(Message.Type.ASSET)
+    override val typeFilter: Seq[TypeFilter] = Seq(TypeFilter(Message.Type.ASSET, None))
   }
 
   //Now we can add more types to this sequence for the "others" category
   case object Files extends ContentType {
     override val msgTypes = Seq(Message.Type.ANY_ASSET)
+    override val typeFilter: Seq[TypeFilter] = Seq(TypeFilter(Message.Type.ANY_ASSET, None))
   }
 
   case object AllContent extends ContentType {
     //feels a little bit messy... maybe think of a neater way to represent the types
     override val msgTypes = Images.msgTypes ++ Files.msgTypes ++ Links.msgTypes
+    override val typeFilter: Seq[TypeFilter] = Seq(
+      TypeFilter(Message.Type.ASSET, Some(8)),
+      TypeFilter(Message.Type.RICH_MEDIA, Some(3)),
+      TypeFilter(Message.Type.ANY_ASSET, Some(3))
+    )
   }
 }

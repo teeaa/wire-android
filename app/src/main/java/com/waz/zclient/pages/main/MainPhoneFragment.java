@@ -70,7 +70,7 @@ public class MainPhoneFragment extends BaseFragment<MainPhoneFragment.Container>
                                                                                             GiphyObserver,
                                                                                             ConfirmationObserver,
                                                                                             AccentColorObserver,
-                                                                                            CollectionsObserver{
+                                                                                            CollectionsObserver {
 
     public static final String TAG = MainPhoneFragment.class.getName();
     private ConfirmationMenu confirmationMenu;

@@ -52,11 +52,15 @@ class CollectionFragment extends BaseFragment[CollectionFragment.Container] with
     controller.addObserver(this)
   }
 
-
   override def onStop(): Unit = {
     super.onStop()
-    if (adapter != null) adapter.closeCursors()
     controller.removeObserver(this)
+  }
+
+
+  override def onDestroy(): Unit = {
+    if (adapter != null) adapter.closeCursors()
+    super.onDestroy()
   }
 
   private def showSingleImage(assetId: AssetId) = {
@@ -95,7 +99,7 @@ class CollectionFragment extends BaseFragment[CollectionFragment.Container] with
     }
 
     val columns = 4
-    adapter = new CollectionAdapter(ViewUtils.getRealDisplayWidth(context), columns, controller)
+    adapter = new CollectionAdapter(recyclerView.viewDim, columns, controller)
     recyclerView.init(adapter)
 
     Signal(adapter.adapterState, controller.focusedItem, controller.conversationName).on(Threading.Ui) {
@@ -113,6 +117,10 @@ class CollectionFragment extends BaseFragment[CollectionFragment.Container] with
         contentView.setText(textIdForContentMode(contentMode))
         name.setText(conversationName)
       case _ =>
+    }
+
+    adapter.contentMode.on(Threading.Ui){
+      _ => recyclerView.smoothScrollToPosition(0)
     }
 
     val toolbar: Toolbar = ViewUtils.getView(view, R.id.t_toolbar)

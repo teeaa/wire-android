@@ -60,11 +60,11 @@ public class CollectionItemDecorator extends RecyclerView.ItemDecoration {
             }
             if (i == 0 || isFirstUnderHeader(position)) {
                 View header = adapter.getHeaderView(parent, position);
-                int translationX = parent.getLeft();
-                int translationY = Math.max(itemView.getTop() - header.getHeight(), 0);
+                int translationX = 0;
+                int translationY = itemView.getTop() - header.getHeight();
                 tempRect.set(translationX, translationY, translationX + header.getWidth(),
                              translationY + header.getHeight());
-                if(tempRect.bottom > highestTop) {
+                if (tempRect.bottom > highestTop) {
                     tempRect.offset(0, highestTop - tempRect.bottom);
                 }
                 drawHeader(c, header, tempRect);

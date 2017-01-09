@@ -18,14 +18,13 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 -->
-<com.waz.zclient.messages.parts.TextPartView
+<com.waz.zclient.views.CollectionSimpleWebLinkPartView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/ltv__row_conversation__message"
+    android:id="@+id/cv__row_conversation__link_preview__container"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    app:font="@string/wire__typeface__light"
-    android:textSize="@dimen/wire__text_size__small"
-    android:padding="@dimen/wire__padding__8"
-    android:background="@drawable/shape_asset_message_background"
-    />
+    android:layout_height="@dimen/collections__small_item_view_height"
+    android:layout_marginTop="@dimen/collections__item_top_margin"
+    app:cardCornerRadius="@dimen/wire__padding__2"
+    app:cardBackgroundColor="@color/light_graphite_8"
+    app:cardElevation="0dp" />

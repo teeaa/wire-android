@@ -25,41 +25,12 @@
     android:orientation="vertical"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:paddingLeft="@dimen/collections__content_horizontal_padding"
-    android:paddingRight="@dimen/collections__content_horizontal_padding"
-    android:paddingTop="@dimen/wire__padding__8"
-    android:paddingBottom="@dimen/wire__padding__8"
     >
-
-    <RelativeLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        >
-        <com.waz.zclient.ui.text.TypefaceTextView
-            android:id="@+id/ttv__collection_item__user_name"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentLeft="true"
-            android:textColor="?wirePrimaryTextColor"
-            android:textSize="@dimen/wire__text_size__small"
-            app:font="@string/wire__typeface__light"
-            />
-        <com.waz.zclient.ui.text.TypefaceTextView
-            android:id="@+id/ttv__collection_item__time"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentRight="true"
-            android:textColor="?wireSecondaryTextColor"
-            android:textSize="@dimen/wire__text_size__small"
-            app:font="@string/wire__typeface__light"
-            />
-    </RelativeLayout>
 
     <FrameLayout
         android:id="@+id/fl__collections__content_layout"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/wire__padding__4">
+        android:layout_height="wrap_content">
     </FrameLayout>
 
 </LinearLayout>

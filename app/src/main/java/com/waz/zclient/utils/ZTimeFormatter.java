@@ -33,6 +33,10 @@ import java.util.Date;
 public class ZTimeFormatter {
 
     public static String getSeparatorTime(@Nullable Resources resources, LocalDateTime now, LocalDateTime then, boolean is24HourFormat, ZoneId timeZone, boolean epocIsJustNow) {
+        return getSeparatorTime(resources, now, then, is24HourFormat, timeZone, epocIsJustNow, true);
+    }
+
+    public static String getSeparatorTime(@Nullable Resources resources, LocalDateTime now, LocalDateTime then, boolean is24HourFormat, ZoneId timeZone, boolean epocIsJustNow, boolean showWeekday) {
         if (resources == null) {
             return "";
         }
@@ -54,9 +58,17 @@ public class ZTimeFormatter {
         if (isSameDay) {
             pattern = time;
         } else if (isThisYear) {
-            pattern = resources.getString(R.string.timestamp_pattern__date_and_time__no_year, time);
+            if (showWeekday) {
+                pattern = resources.getString(R.string.timestamp_pattern__date_and_time__no_year, time);
+            } else {
+                pattern = resources.getString(R.string.timestamp_pattern__date_and_time__no_year_no_weekday, time);
+            }
         } else {
-            pattern = resources.getString(R.string.timestamp_pattern__date_and_time__with_year, time);
+            if (showWeekday) {
+                pattern = resources.getString(R.string.timestamp_pattern__date_and_time__with_year, time);
+            } else {
+                pattern = resources.getString(R.string.timestamp_pattern__date_and_time__with_year_no_weekday, time);
+            }
         }
         return DateTimeFormatter.ofPattern(pattern).format(then.atZone(timeZone));
     }

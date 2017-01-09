@@ -42,7 +42,7 @@ import android.view.View.OnClickListener
 import android.view.{LayoutInflater, View, ViewGroup}
 import android.widget.{LinearLayout, TextView}
 import com.waz.ZLog._
-import com.waz.api.{Message, MessageFilter}
+import com.waz.api.{Message, MessageFilter, TypeFilter}
 import com.waz.model._
 import com.waz.service.ZMessaging
 import com.waz.threading.Threading
@@ -57,12 +57,12 @@ import com.waz.zclient.ui.text.GlyphTextView
 import com.waz.zclient.ui.utils.ResourceUtils
 import com.waz.zclient.utils.ViewUtils
 import com.waz.zclient.views._
-import com.waz.zclient.{Injectable, Injector, R}
+import com.waz.zclient.{Injectable, Injector, R, ViewHelper}
 import org.threeten.bp._
 import org.threeten.bp.temporal.ChronoUnit
 
 //For now just handling images
-class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsController)(implicit context: Context, injector: Injector, eventContext: EventContext) extends RecyclerView.Adapter[ViewHolder] with Injectable { adapter =>
+class CollectionAdapter(viewDim: Signal[Dim2], columns: Int, ctrler: ICollectionsController)(implicit context: Context, injector: Injector, eventContext: EventContext) extends RecyclerView.Adapter[ViewHolder] with Injectable { adapter =>
 
   private implicit val tag: LogTag = logTagFor[CollectionAdapter]
 
@@ -70,7 +70,6 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
   private val selectedConversation = inject[SelectionController].selectedConv
 
   val contentMode = Signal[ContentType](AllContent)
-  //contentMode.disableAutowiring()
 
   val conv = for {
     zs <- zms
@@ -93,7 +92,7 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
     val cursor = for {
       zs <- zms
       Some(c) <- conv
-      rc <- Signal(new RecyclerCursor(c.id, zs, notifier, Some(MessageFilter(Some(contentType.msgTypes), if (contentType == AllContent) Some(8) else None))))
+      rc <- Signal(new RecyclerCursor(c.id, zs, notifier, Some(MessageFilter(Some(contentType.typeFilter)))))
       _ <- rc.countSignal
     } yield rc
 
@@ -112,7 +111,7 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
 
   def messages = contentMode.currentValue.fold(Option.empty[RecyclerCursor])(collectionCursors(_))
 
-  contentMode.on(Threading.Ui){ cm =>
+  Signal(contentMode, viewDim) .on(Threading.Ui){ _ =>
     notifyDataSetChanged()
   }
 
@@ -143,7 +142,7 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
     getItem(position).foreach{ md =>
       holder match {
         case f: FileViewHolder => f.setMessageData(md)
-        case c: CollectionImageViewHolder => c.setMessageData(md, screenWidth / columns, ResourceUtils.getRandomAccentColor(context))
+        case c: CollectionImageViewHolder => c.setMessageData(md, viewDim.currentValue.fold(0)(_.width) / columns, ResourceUtils.getRandomAccentColor(context))
         case l: LinkPreviewViewHolder => l.setMessageData(md)
         case l: SimpleLinkViewHolder => l.setMessageData(md)
       }
@@ -186,10 +185,10 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
 
   override def onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder =
     viewType match {
-      case CollectionAdapter.VIEW_TYPE_FILE => FileViewHolder(inflateCollectionNormalItemView(R.layout.collection_file_asset, parent))
+      case CollectionAdapter.VIEW_TYPE_FILE => FileViewHolder(inflateCollectionView(CollectionAdapter.VIEW_TYPE_FILE, parent))
       case CollectionAdapter.VIEW_TYPE_IMAGE => CollectionImageViewHolder(inflateCollectionImageView(parent), imageListener)
-      case CollectionAdapter.VIEW_TYPE_LINK_PREVIEW => LinkPreviewViewHolder(inflateCollectionNormalItemView(R.layout.collection_link_preview, parent))
-      case CollectionAdapter.VIEW_TYPE_SIMPLE_LINK => SimpleLinkViewHolder(inflateCollectionNormalItemView(R.layout.collection_text, parent))
+      case CollectionAdapter.VIEW_TYPE_LINK_PREVIEW => LinkPreviewViewHolder(inflateCollectionView(CollectionAdapter.VIEW_TYPE_LINK_PREVIEW, parent))
+      case CollectionAdapter.VIEW_TYPE_SIMPLE_LINK => SimpleLinkViewHolder(inflateCollectionView(CollectionAdapter.VIEW_TYPE_SIMPLE_LINK, parent))
       case _ => returning(null.asInstanceOf[ViewHolder])(_ => error(s"Unexpected ViewType: $viewType"))
     }
 
@@ -199,9 +198,15 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
     view
   }
 
-  private def inflateCollectionNormalItemView(contentId: Int, parent: ViewGroup): CollectionNormalItemView = {
-    val view = new CollectionNormalItemView(context)
-    view.inflateContent(contentId)
+  private def inflateCollectionView(viewType: Int, parent: ViewGroup): CollectionNormalItemView ={
+    val view = viewType match {
+      case CollectionAdapter.VIEW_TYPE_FILE =>
+        ViewHelper.inflate[CollectionNormalItemView](R.layout.collection_file_asset, parent, addToParent = false)
+      case CollectionAdapter.VIEW_TYPE_LINK_PREVIEW =>
+        ViewHelper.inflate[CollectionNormalItemView](R.layout.collection_link_preview, parent, addToParent = false)
+      case CollectionAdapter.VIEW_TYPE_SIMPLE_LINK =>
+        ViewHelper.inflate[CollectionNormalItemView](R.layout.collection_simple_link, parent, addToParent = false)
+    }
     parent.addView(view)
     view
   }
@@ -262,12 +267,16 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
       header.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
     }
 
-    header.nameView.setText(getHeaderText(getHeaderId(position)))
-    header.countView.setText(getHeaderCountText(getHeaderId(position)))
+    val headerId = getHeaderId(position)
+    header.iconView.setText(getHeaderIcon(headerId))
+    header.nameView.setText(getHeaderText(headerId))
+    header.countView.setText(getHeaderCountText(headerId))
     if (contentMode.currentValue.contains(AllContent)) {
       header.arrowView.setVisibility(View.VISIBLE)
+      header.iconView.setVisibility(View.VISIBLE)
     } else {
       header.arrowView.setVisibility(View.GONE)
+      header.iconView.setVisibility(View.GONE)
     }
 
     val widthSpec: Int = View.MeasureSpec.makeMeasureSpec(parent.getWidth, View.MeasureSpec.EXACTLY)
@@ -286,7 +295,12 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
       case HeaderId(HeaderType.Links, _, _) => "LINKS"
       case HeaderId(HeaderType.Today, _, _) => "TODAY"
       case HeaderId(HeaderType.Yesterday, _, _) => "YESTERDAY"
-      case HeaderId(HeaderType.MonthName, m, y) => Month.of(m).toString + " " + y
+      case HeaderId(HeaderType.MonthName, m, y) =>
+        if (LocalDateTime.now.getYear == y) {
+          Month.of(m).toString
+        } else {
+          Month.of(m).toString + " " + y
+        }
       case _ => ""
     }
   }
@@ -297,6 +311,15 @@ class CollectionAdapter(screenWidth: Int, columns: Int, ctrler: ICollectionsCont
       case HeaderId(HeaderType.Files, _, _) => "All " + collectionCursors(Files).fold(0)(_.count)
       case HeaderId(HeaderType.Links, _, _) => "All " + collectionCursors(Links).fold(0)(_.count)
       case _ => ""
+    }
+  }
+
+  private def getHeaderIcon(headerId: HeaderId): Int = {
+    headerId match {
+      case HeaderId(HeaderType.Images, _, _) => R.string.glyph__picture
+      case HeaderId(HeaderType.Files, _, _) => R.string.glyph__file
+      case HeaderId(HeaderType.Links, _, _) => R.string.glyph__link
+      case _ => R.string.glyph__file
     }
   }
 
@@ -345,6 +368,7 @@ object CollectionAdapter {
 
     def this(context: Context) =  this(context, null)
 
+    lazy val iconView: GlyphTextView = ViewUtils.getView(this, R.id.gtv_collection_icon)
     lazy val nameView: TextView = ViewUtils.getView(this, R.id.ttv__collection_header__name)
     lazy val countView: TextView = ViewUtils.getView(this, R.id.ttv__collection_header__count)
     lazy val arrowView: GlyphTextView = ViewUtils.getView(this, R.id.gtv__arrow)

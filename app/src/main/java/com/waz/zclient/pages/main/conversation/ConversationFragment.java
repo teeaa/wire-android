@@ -184,7 +184,7 @@ public class ConversationFragment extends BaseFragment<ConversationFragment.Cont
                                                                                                   ExtendedCursorContainer.Callback,
                                                                                                   EphemeralLayout.Callback,
                                                                                                   TypingIndicatorView.Callback,
-                                                                                                  CollectionsObserver{
+                                                                                                  CollectionsObserver {
     public static final String TAG = ConversationFragment.class.getName();
     private static final String SAVED_STATE_PREVIEW = "SAVED_STATE_PREVIEW";
     private static final int REQUEST_VIDEO_CAPTURE = 911;

@@ -71,7 +71,7 @@
 
     <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="50dp"
+        android:layout_height="@dimen/collections__multi_share_footer_height"
         android:background="?wireDividerColorSolid">
 
         <com.waz.zclient.ui.views.CursorIconButton
