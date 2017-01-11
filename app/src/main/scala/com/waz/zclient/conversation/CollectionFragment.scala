@@ -21,8 +21,9 @@ import android.content.Context
 import android.os.Bundle
 import android.support.v4.app.FragmentManager
 import android.support.v7.widget.Toolbar
+import android.view.MenuItem.OnMenuItemClickListener
 import android.view.View.OnClickListener
-import android.view.{LayoutInflater, View, ViewGroup}
+import android.view.{LayoutInflater, MenuItem, View, ViewGroup}
 import android.widget.TextView
 import com.waz.ZLog._
 import com.waz.api.Message
@@ -33,6 +34,7 @@ import com.waz.zclient.controllers.collections.CollectionsObserver
 import com.waz.zclient.conversation.CollectionAdapter.AdapterState
 import com.waz.zclient.conversation.CollectionController._
 import com.waz.zclient.pages.BaseFragment
+import com.waz.zclient.ui.theme.ThemeUtils
 import com.waz.zclient.utils.ViewUtils
 import com.waz.zclient.{FragmentHelper, OnBackPressedListener, R}
 import org.threeten.bp.{LocalDateTime, ZoneId}
@@ -78,19 +80,13 @@ class CollectionFragment extends BaseFragment[CollectionFragment.Container] with
     }
   }
 
-  private def textIdForContentMode(contentType: ContentType) = contentType match {
-    case Images => R.string.collection_header_pictures
-    case Files => R.string.collection_header_files
-    case Links => R.string.collection_header_links
-    case _ => R.string.collection_header_all
-  }
-
   override def onCreateView(inflater: LayoutInflater, container: ViewGroup, savedInstanceState: Bundle): View = {
     val view = inflater.inflate(R.layout.fragment_collection, container, false)
     val name: TextView  = ViewUtils.getView(view, R.id.tv__collection_toolbar__name)
-    val contentView: TextView = ViewUtils.getView(view, R.id.tv__collection_toolbar__content)
+    val timestamp: TextView  = ViewUtils.getView(view, R.id.tv__collection_toolbar__timestamp)
     val recyclerView: CollectionRecyclerView = ViewUtils.getView(view, R.id.rv__collection)
     val emptyView: View = ViewUtils.getView(view, R.id.ll__collection__empty)
+    val toolbar: Toolbar = ViewUtils.getView(view, R.id.t_toolbar)
     emptyView.setVisibility(View.GONE)
 
     controller.focusedItem.on(Threading.Ui) {
@@ -102,20 +98,35 @@ class CollectionFragment extends BaseFragment[CollectionFragment.Container] with
     adapter = new CollectionAdapter(recyclerView.viewDim, columns, controller)
     recyclerView.init(adapter)
 
-    Signal(adapter.adapterState, controller.focusedItem, controller.conversationName).on(Threading.Ui) {
-      case (AdapterState(_, _, _), Some(messageData), conversationName) =>
-        name.setText(LocalDateTime.ofInstant(messageData.time, ZoneId.systemDefault()).toLocalDate.toString)
-        contentView.setText(conversationName)
-      case (AdapterState(contentMode, 0, false), None, conversationName) =>
+    def setNavigationIconVisibility(visible: Boolean) = {
+      if (visible) {
+        if (ThemeUtils.isDarkTheme(getContext)) {
+          toolbar.setNavigationIcon(R.drawable.action_back_light)
+        } else {
+          toolbar.setNavigationIcon(R.drawable.action_back_dark)
+        }
+      } else {
+        toolbar.setNavigationIcon(null)
+      }
+    }
+
+    controller.conversationName.on(Threading.Ui){ name.setText }
+
+    Signal(adapter.adapterState, controller.focusedItem).on(Threading.Ui) {
+      case (AdapterState(_, _, _), Some(messageData)) =>
+        setNavigationIconVisibility(true)
+        timestamp.setVisibility(View.VISIBLE)
+        timestamp.setText(LocalDateTime.ofInstant(messageData.time, ZoneId.systemDefault()).toLocalDate.toString)
+      case (AdapterState(AllContent, 0, false), None) =>
         emptyView.setVisibility(View.VISIBLE)
         recyclerView.setVisibility(View.GONE)
-        contentView.setText(textIdForContentMode(contentMode))
-        name.setText(conversationName)
-      case (AdapterState(contentMode, _, _), None, conversationName) =>
+        setNavigationIconVisibility(false)
+        timestamp.setVisibility(View.GONE)
+      case (AdapterState(contentMode, _, _), None) =>
         emptyView.setVisibility(View.GONE)
         recyclerView.setVisibility(View.VISIBLE)
-        contentView.setText(textIdForContentMode(contentMode))
-        name.setText(conversationName)
+        setNavigationIconVisibility(contentMode != AllContent)
+        timestamp.setVisibility(View.GONE)
       case _ =>
     }
 
@@ -123,11 +134,24 @@ class CollectionFragment extends BaseFragment[CollectionFragment.Container] with
       _ => recyclerView.smoothScrollToPosition(0)
     }
 
-    val toolbar: Toolbar = ViewUtils.getView(view, R.id.t_toolbar)
+    toolbar.inflateMenu(R.menu.toolbar_collection)
+
     toolbar.setNavigationOnClickListener(new OnClickListener {
-      override def onClick(v: View): Unit = onBackPressed
+      override def onClick(v: View): Unit = {
+        onBackPressed()
+      }
     })
 
+    toolbar.setOnMenuItemClickListener(new Toolbar.OnMenuItemClickListener {
+      override def onMenuItemClick(item: MenuItem): Boolean = {
+        item.getItemId match {
+          case R.id.close =>
+            getControllerFactory.getCollectionsController.closeCollection()
+            return true
+        }
+        false
+      }
+    })
     view
   }
 
@@ -137,7 +161,7 @@ class CollectionFragment extends BaseFragment[CollectionFragment.Container] with
       case _ =>
     }
     if (!adapter.onBackPressed)
-      getControllerFactory.getCollectionsController.closeCollection
+      getControllerFactory.getCollectionsController.closeCollection()
     true
   }
 
@@ -147,17 +171,9 @@ class CollectionFragment extends BaseFragment[CollectionFragment.Container] with
 
   override def closeCollectionShare(): Unit = {}
 
-  override def previousItemRequested(): Unit =
-    controller.focusedItem mutate {
-      case Some(messageData) => None
-      case _ => None
-    }
+  override def previousItemRequested(): Unit = {}
 
-  override def nextItemRequested(): Unit =
-    controller.focusedItem mutate {
-      case Some(messageData) => None
-      case _ => None
-    }
+  override def nextItemRequested(): Unit = {}
 
   override def closeCollection(): Unit = {}
 }

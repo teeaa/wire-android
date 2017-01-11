@@ -139,5 +139,8 @@
     <!-- sketch -->
     <attr name="sketchToolbar" format="reference" />
 
+    <!-- Collection -->
+    <attr name="wireBackgroundCollection" format="reference" />
+    <attr name="collectionToolbar" format="reference" />
 
 </resources>

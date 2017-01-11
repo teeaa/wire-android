@@ -1,7 +1,8 @@
-<?xml version="1.0" encoding="utf-8"?><!--
+<?xml version="1.0" encoding="utf-8"?>
+<!--
 
     Wire
-    Copyright (C) 2017 Wire Swiss GmbH
+    Copyright (C) 2016 Wire Swiss GmbH
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,9 +18,16 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 -->
-<com.waz.zclient.views.CollectionFileAssetPartView
-                                                         xmlns:android="http://schemas.android.com/apk/res/android"
-                                                         android:layout_width="match_parent"
-                                                         android:layout_height="@dimen/collections__medium_item_view_height"
-                                                         android:layout_marginTop="@dimen/wire__padding__2"
-    />
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/separator_dark" />
+        </shape>
+    </item>
+
+    <item android:bottom="@dimen/wire__divider__height__thin">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/collection_background_dark" />
+        </shape>
+    </item>
+</layer-list>

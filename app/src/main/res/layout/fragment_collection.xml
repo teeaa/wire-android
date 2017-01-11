@@ -24,51 +24,51 @@
               android:layout_height="match_parent"
               android:clickable="true"
               android:orientation="vertical"
-              style="?wireBackground"
+              android:background="?wireBackgroundCollection"
     >
 
     <android.support.v7.widget.Toolbar
         android:id="@+id/t_toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:clickable="true"
+        android:clickable="false"
         app:contentInsetStart="@dimen/content__padding_left"
-        style="?conversationToolbar"
+        style="?collectionToolbar"
         >
 
-
         <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_gravity="start|center_vertical"
-            android:gravity="center_vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
             android:orientation="vertical"
-            >
-
-            <com.waz.zclient.ui.text.TypefaceTextView
-                android:id="@+id/tv__collection_toolbar__content"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="@dimen/wire__padding__regular"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:background="@null"
-                app:font="@string/wire__typeface__bold"
-                style="?conversationToolbar"
-                />
+            android:gravity="center">
 
             <com.waz.zclient.ui.text.TypefaceTextView
                 android:id="@+id/tv__collection_toolbar__name"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="@dimen/wire__padding__regular"
+                android:layout_height="match_parent"
+                android:layout_gravity="center_horizontal"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:background="@null"
+                app:font="@string/wire__typeface__regular"
+                style="?conversationToolbar"
+                />
+
+            <com.waz.zclient.ui.text.TypefaceTextView
+                android:id="@+id/tv__collection_toolbar__timestamp"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_gravity="center_horizontal"
                 android:maxLines="1"
                 android:ellipsize="end"
                 android:background="@null"
                 style="?conversationToolbar"
+                android:textSize="@dimen/wire__text_size__small"
                 />
-
         </LinearLayout>
+
+
 
     </android.support.v7.widget.Toolbar>
 
@@ -80,8 +80,10 @@
             android:id="@+id/rv__collection"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_marginLeft="@dimen/wire__padding__big"
-            android:layout_marginRight="@dimen/wire__padding__big"
+            android:layout_marginLeft="@dimen/wire__padding__regular"
+            android:layout_marginRight="@dimen/wire__padding__regular"
+            android:paddingBottom="@dimen/collections__content_bottom_padding"
+            android:clipToPadding="false"
             />
 
         <LinearLayout
@@ -95,15 +97,19 @@
             <com.waz.zclient.ui.text.GlyphTextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/glyph__library"
+                android:text="@string/glyph__collection"
                 android:textSize="@dimen/wire__text_size__insane"
                 android:padding="@dimen/wire__padding__regular"
+                android:textColor="@color/light_graphite_16"
                 />
 
             <com.waz.zclient.ui.text.TypefaceTextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:textSize="@dimen/wire__text_size__small"
+                android:textColor="@color/light_graphite_40"
                 android:text="@string/collection_empty"
+                app:font="@string/wire__typeface__regular"
                 />
 
         </LinearLayout>

@@ -32,6 +32,7 @@
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:clickable="true"
+        android:gravity="center"
         app:contentInsetStart="@dimen/content__padding_left"
         style="?conversationToolbarNoDivider"
         >

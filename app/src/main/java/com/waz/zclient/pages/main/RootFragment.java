@@ -32,6 +32,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.Interpolator;
+
 import com.waz.api.ConversationsList;
 import com.waz.api.IConversation;
 import com.waz.api.ImageAsset;
@@ -42,10 +43,8 @@ import com.waz.api.SyncState;
 import com.waz.api.User;
 import com.waz.api.UsersList;
 import com.waz.api.Verification;
-import com.waz.model.MessageData;
 import com.waz.zclient.OnBackPressedListener;
 import com.waz.zclient.R;
-import com.waz.zclient.controllers.collections.CollectionsObserver;
 import com.waz.zclient.controllers.drawing.DrawingController;
 import com.waz.zclient.controllers.drawing.DrawingObserver;
 import com.waz.zclient.controllers.drawing.IDrawingController;
@@ -54,7 +53,6 @@ import com.waz.zclient.controllers.location.LocationObserver;
 import com.waz.zclient.controllers.navigation.Page;
 import com.waz.zclient.controllers.navigation.PagerControllerObserver;
 import com.waz.zclient.controllers.usernames.UsernamesControllerObserver;
-import com.waz.zclient.conversation.CollectionFragment;
 import com.waz.zclient.core.api.scala.ModelObserver;
 import com.waz.zclient.core.controllers.tracking.events.media.SentPictureEvent;
 import com.waz.zclient.core.stores.connect.IConnectStore;
@@ -109,8 +107,7 @@ public class RootFragment extends BaseFragment<RootFragment.Container> implement
                                                                        ParticipantsStoreObserver,
                                                                        UsernamesControllerObserver,
                                                                        ConversationFragment.Container,
-                                                                       ConversationListManagerFragment.Container,
-                                                                       CollectionsObserver {
+                                                                       ConversationListManagerFragment.Container {
     public static final String TAG = RootFragment.class.getName();
     private static final Interpolator RIGHT_VIEW_ALPHA_INTERPOLATOR = new Quart.EaseOut();
     private View leftView;
@@ -236,7 +233,6 @@ public class RootFragment extends BaseFragment<RootFragment.Container> implement
         getStoreFactory().getParticipantsStore().addParticipantsStoreObserver(this);
         getControllerFactory().getLocationController().addObserver(this);
         onPagerEnabledStateHasChanged(getControllerFactory().getNavigationController().isPagerEnabled());
-        getControllerFactory().getCollectionsController().addObserver(this);
     }
 
     @Override
@@ -253,7 +249,6 @@ public class RootFragment extends BaseFragment<RootFragment.Container> implement
         getControllerFactory().getPickUserController().removePickUserScreenControllerObserver(this);
         getControllerFactory().getGiphyController().removeObserver(this);
         getControllerFactory().getDrawingController().removeDrawingObserver(this);
-        getControllerFactory().getCollectionsController().removeObserver(this);
         super.onStop();
     }
 
@@ -551,43 +546,6 @@ public class RootFragment extends BaseFragment<RootFragment.Container> implement
         if (fragment != null) {
             getChildFragmentManager().beginTransaction().remove(fragment).commit();
         }
-    }
-
-    @Override
-    public void openCollection() {
-        getChildFragmentManager().beginTransaction()
-                                 .add(R.id.fl__root__giphy,
-                                      CollectionFragment.newInstance(),
-                                      CollectionFragment.TAG())
-                                 .commit();
-    }
-
-    @Override
-    public void closeCollection() {
-        Fragment fragment = getChildFragmentManager().findFragmentById(R.id.fl__root__giphy);
-        if (fragment != null) {
-            getChildFragmentManager().beginTransaction().remove(fragment).commit();
-        }
-    }
-
-    @Override
-    public void shareCollectionItem(MessageData messageData) {
-
-    }
-
-    @Override
-    public void closeCollectionShare() {
-
-    }
-
-    @Override
-    public void nextItemRequested() {
-
-    }
-
-    @Override
-    public void previousItemRequested() {
-
     }
 
     @Override

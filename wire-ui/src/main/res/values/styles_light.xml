@@ -301,4 +301,8 @@
         <item name="android:textColor">@color/light_graphite</item>
     </style>
 
+    <style name="collection_toolbar__light" parent="conversation_toolbar__light">
+        <item name="android:background">@drawable/toolbar_collection_background__light</item>
+    </style>
+
 </resources>

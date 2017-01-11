@@ -19,6 +19,7 @@ package com.waz.zclient.views
 
 import android.animation.ValueAnimator
 import android.animation.ValueAnimator.AnimatorUpdateListener
+import android.graphics.PorterDuff.Mode
 import android.graphics._
 import android.graphics.drawable.Drawable
 import android.net.Uri
@@ -123,10 +124,14 @@ class ImageAssetDrawable(
       if (st.bmp.isEmpty || bitmapPaint.getAlpha < 255)
         background foreach { _.draw(canvas) }
 
-      st.bmp foreach {
-        canvas.drawBitmap(_, matrix, bitmapPaint)
+      st.bmp foreach { bm =>
+        drawBitmap(canvas, bm, matrix, bitmapPaint)
       }
     }
+  }
+
+  protected def drawBitmap(canvas: Canvas, bm: Bitmap, matrix: Matrix, bitmapPaint: Paint): Unit ={
+    canvas.drawBitmap(bm, matrix, bitmapPaint)
   }
 
   override def onBoundsChange(bounds: Rect): Unit = {
@@ -203,6 +208,23 @@ object ImageAssetDrawable {
     case class Loading(src: ImageSource) extends State
     case class Loaded(src: ImageSource, override val bmp: Option[Bitmap], etag: Int = 0) extends State
     case class Failed(src: ImageSource, ex: Option[Throwable] = None) extends State
+  }
+}
+
+class RoundedImageAssetDrawable (
+                                  src: Signal[ImageSource],
+                                  scaleType: ScaleType = ScaleType.FitXY,
+                                  request: RequestBuilder = RequestBuilder.Regular,
+                                  background: Option[Drawable] = None,
+                                  cornerRadius: Float = 0
+                                )(implicit inj: Injector, eventContext: EventContext) extends ImageAssetDrawable(src, scaleType, request, background) {
+
+  override protected def drawBitmap(canvas: Canvas, bm: Bitmap, matrix: Matrix, bitmapPaint: Paint): Unit = {
+    val shader = new BitmapShader(bm, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+    shader.setLocalMatrix(matrix)
+    val rect = new RectF(0.0f, 0.0f, getBounds.width, getBounds.height)
+    bitmapPaint.setShader(shader)
+    canvas.drawRoundRect(rect, 10, 10, bitmapPaint)
   }
 }
 

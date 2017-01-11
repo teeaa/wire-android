@@ -18,7 +18,10 @@
 package com.waz.zclient.views
 
 import android.content.Context
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
+import android.support.v4.view.ViewCompat
 import android.support.v7.widget.{CardView, RecyclerView}
 import android.text.format.DateFormat
 import android.text.util.Linkify
@@ -26,7 +29,7 @@ import android.util.AttributeSet
 import android.view.{HapticFeedbackConstants, View}
 import android.view.View.OnClickListener
 import android.webkit.URLUtil
-import android.widget.{ImageView, TextView}
+import android.widget.{ImageView, RelativeLayout, TextView}
 import com.waz.api.impl.AccentColor
 import com.waz.model._
 import com.waz.service.ZMessaging
@@ -95,7 +98,7 @@ class CollectionImageView(context: Context) extends AspectRatioImageView(context
   setPadding(padding, padding, padding, padding)
 
   messageData.on(Threading.Ui) { md =>
-    val imageDrawable = new ImageAssetDrawable(Signal(WireImage(md.assetId)), scaleType = ImageAssetDrawable.ScaleType.CenterCrop)
+    val imageDrawable = new RoundedImageAssetDrawable(Signal(WireImage(md.assetId)), scaleType = ImageAssetDrawable.ScaleType.CenterCrop, cornerRadius = 10)
     setImageDrawable(imageDrawable)
   }
 
@@ -127,11 +130,9 @@ class CollectionSimpleWebLinkPartView(context: Context, attrs: AttributeSet, sty
 
   override val tpe: MsgPart = MsgPart.WebLink
 
-  inflate(R.layout.collection_message_part_weblink_content)
+  inflate(R.layout.collection_message_part_simple_link_content)
 
-  lazy val titleTextView: TextView  = findById(R.id.ttv__row_conversation__link_preview__title)
   lazy val urlTextView: TextView    = findById(R.id.ttv__row_conversation__link_preview__url)
-  lazy val imageView: ImageView     = findById(R.id.iv__row_conversation__link_preview__image)
 
   private val message = Signal[MessageData]()
 
@@ -145,8 +146,6 @@ class CollectionSimpleWebLinkPartView(context: Context, attrs: AttributeSet, sty
   }
 
   override def set(msg: MessageData, part: Option[MessageContent], opts: MsgBindOptions): Unit = {
-    titleTextView.setVisibility(View.GONE)
-    imageView.setVisibility(View.GONE)
     message ! msg
   }
 }

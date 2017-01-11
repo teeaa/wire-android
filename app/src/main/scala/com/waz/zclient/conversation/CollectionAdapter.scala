@@ -60,6 +60,7 @@ import com.waz.zclient.views._
 import com.waz.zclient.{Injectable, Injector, R, ViewHelper}
 import org.threeten.bp._
 import org.threeten.bp.temporal.ChronoUnit
+import com.waz.zclient.utils.ContextUtils._
 
 //For now just handling images
 class CollectionAdapter(viewDim: Signal[Dim2], columns: Int, ctrler: ICollectionsController)(implicit context: Context, injector: Injector, eventContext: EventContext) extends RecyclerView.Adapter[ViewHolder] with Injectable { adapter =>
@@ -96,12 +97,12 @@ class CollectionAdapter(viewDim: Signal[Dim2], columns: Int, ctrler: ICollection
       _ <- rc.countSignal
     } yield rc
 
-    verbose(s"Started loading for: ${contentType.toString}")
+    debug(s"Started loading for: ${contentType.toString}")
     cursor.on(Threading.Ui) { c =>
       if (!collectionCursors(contentType).contains(c)) {
         collectionCursors(contentType).foreach(_.close())
         collectionCursors(contentType) = Some(c)
-        verbose(s"Cursor loaded for: ${contentType.toString}, current mode is: ${contentMode.currentValue.toString}")
+        debug(s"Cursor loaded for: ${contentType.toString}, current mode is: ${contentMode.currentValue.toString}")
         notifier.notifyDataSetChanged()
       }
     }
@@ -163,9 +164,9 @@ class CollectionAdapter(viewDim: Signal[Dim2], columns: Int, ctrler: ICollection
       contentMode.mutate {
         case AllContent =>
           getHeaderId(position) match {
-            case Header.mainLinks => Links
-            case Header.mainImages => Images
-            case Header.mainFiles => Files
+            case Header.mainLinks if shouldBeClickable(Header.mainLinks) => Links
+            case Header.mainImages if shouldBeClickable(Header.mainImages) => Images
+            case Header.mainFiles if shouldBeClickable(Header.mainFiles)=> Files
             case _ => AllContent
           }
         case currentMode => currentMode
@@ -272,11 +273,17 @@ class CollectionAdapter(viewDim: Signal[Dim2], columns: Int, ctrler: ICollection
     header.nameView.setText(getHeaderText(headerId))
     header.countView.setText(getHeaderCountText(headerId))
     if (contentMode.currentValue.contains(AllContent)) {
-      header.arrowView.setVisibility(View.VISIBLE)
       header.iconView.setVisibility(View.VISIBLE)
     } else {
-      header.arrowView.setVisibility(View.GONE)
       header.iconView.setVisibility(View.GONE)
+    }
+
+    if (shouldBeClickable(headerId)) {
+      header.countView.setVisibility(View.VISIBLE)
+      header.arrowView.setVisibility(View.VISIBLE)
+    } else {
+      header.countView.setVisibility(View.GONE)
+      header.arrowView.setVisibility(View.GONE)
     }
 
     val widthSpec: Int = View.MeasureSpec.makeMeasureSpec(parent.getWidth, View.MeasureSpec.EXACTLY)
@@ -290,11 +297,11 @@ class CollectionAdapter(viewDim: Signal[Dim2], columns: Int, ctrler: ICollection
 
   private def getHeaderText(headerId: HeaderId): String = {
     headerId match {
-      case HeaderId(HeaderType.Images, _, _) => "PICTURES"
-      case HeaderId(HeaderType.Files, _, _) => "FILES"
-      case HeaderId(HeaderType.Links, _, _) => "LINKS"
-      case HeaderId(HeaderType.Today, _, _) => "TODAY"
-      case HeaderId(HeaderType.Yesterday, _, _) => "YESTERDAY"
+      case HeaderId(HeaderType.Images, _, _) => getString(R.string.collection_header_pictures)
+      case HeaderId(HeaderType.Files, _, _) => getString(R.string.collection_header_files)
+      case HeaderId(HeaderType.Links, _, _) => getString(R.string.collection_header_links)
+      case HeaderId(HeaderType.Today, _, _) => getString(R.string.collection_header_today)
+      case HeaderId(HeaderType.Yesterday, _, _) => getString(R.string.collection_header_yesterday)
       case HeaderId(HeaderType.MonthName, m, y) =>
         if (LocalDateTime.now.getYear == y) {
           Month.of(m).toString
@@ -306,12 +313,30 @@ class CollectionAdapter(viewDim: Signal[Dim2], columns: Int, ctrler: ICollection
   }
 
   private def getHeaderCountText(headerId: HeaderId): String = {
-    headerId match {
-      case HeaderId(HeaderType.Images, _, _) => "All " + collectionCursors(Images).fold(0)(_.count)
-      case HeaderId(HeaderType.Files, _, _) => "All " + collectionCursors(Files).fold(0)(_.count)
-      case HeaderId(HeaderType.Links, _, _) => "All " + collectionCursors(Links).fold(0)(_.count)
-      case _ => ""
+    val count = getHeaderCount(headerId)
+    if (count > 0) {
+      return context.getResources.getString(R.string.collection_all, count.toString)
     }
+    ""
+  }
+
+  private def getHeaderCount(headerId: HeaderId): Int = {
+    headerId match {
+      case HeaderId(HeaderType.Images, _, _) => collectionCursors(Images).fold(0)(_.count)
+      case HeaderId(HeaderType.Files, _, _) => collectionCursors(Files).fold(0)(_.count)
+      case HeaderId(HeaderType.Links, _, _) => collectionCursors(Links).fold(0)(_.count)
+      case _ => 0
+    }
+  }
+
+  private def shouldBeClickable(headerId: HeaderId): Boolean = {
+    val minCount = headerId match {
+      case HeaderId(HeaderType.Images, _, _) => AllContent.typeFilter.find(_.msgType == Message.Type.ASSET).flatMap(_.limit).getOrElse(0)
+      case HeaderId(HeaderType.Files, _, _) => AllContent.typeFilter.find(_.msgType == Message.Type.ANY_ASSET).flatMap(_.limit).getOrElse(0)
+      case HeaderId(HeaderType.Links, _, _) => AllContent.typeFilter.find(_.msgType == Message.Type.RICH_MEDIA).flatMap(_.limit).getOrElse(0)
+      case _ => 0
+    }
+    minCount > 0 && getHeaderCount(headerId) > minCount
   }
 
   private def getHeaderIcon(headerId: HeaderId): Int = {
@@ -379,27 +404,27 @@ object CollectionAdapter {
   class CollectionRecyclerNotifier(contentType: ContentType, adapter: CollectionAdapter) extends RecyclerNotifier{
     override def notifyDataSetChanged(): Unit = {
       if (adapter.contentMode.currentValue.contains(contentType)) {
-          verbose(s"Will notifyDataSetChanged. contentType: ${contentType.toString}, current mode is: ${adapter.contentMode.currentValue.toString}")
+        debug(s"Will notifyDataSetChanged. contentType: ${contentType.toString}, current mode is: ${adapter.contentMode.currentValue.toString}")
           adapter.notifyDataSetChanged()
       }
     }
 
     override def notifyItemRangeInserted(index: Int, length: Int): Unit = {
       if (adapter.contentMode.currentValue.contains(contentType)) {
-        verbose(s"Will notifyItemRangeInserted. contentType: ${contentType.toString}, current mode is: ${adapter.contentMode.currentValue.toString}")
+        debug(s"Will notifyItemRangeInserted. contentType: ${contentType.toString}, current mode is: ${adapter.contentMode.currentValue.toString}")
         adapter.notifyItemRangeInserted(index, length)
       }
     }
 
     override def notifyItemRangeChanged(index: Int, length: Int): Unit =
       if (adapter.contentMode.currentValue.contains(contentType)) {
-        verbose(s"Will notifyItemRangeChanged. contentType: ${contentType.toString}, current mode is: ${adapter.contentMode.currentValue.toString}")
+        debug(s"Will notifyItemRangeChanged. contentType: ${contentType.toString}, current mode is: ${adapter.contentMode.currentValue.toString}")
         adapter.notifyItemRangeChanged(index, length)
       }
 
     override def notifyItemRangeRemoved(pos: Int, count: Int): Unit =
       if (adapter.contentMode.currentValue.contains(contentType)) {
-        verbose(s"Will notifyItemRangeRemoved. contentType: ${contentType.toString}, current mode is: ${adapter.contentMode.currentValue.toString}")
+        debug(s"Will notifyItemRangeRemoved. contentType: ${contentType.toString}, current mode is: ${adapter.contentMode.currentValue.toString}")
         adapter.notifyItemRangeRemoved(pos, count)
       }
   }

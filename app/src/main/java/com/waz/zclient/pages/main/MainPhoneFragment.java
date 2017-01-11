@@ -372,18 +372,10 @@ public class MainPhoneFragment extends BaseFragment<MainPhoneFragment.Container>
 
     @Override
     public void openCollection() {
-        getChildFragmentManager().beginTransaction()
-                                 .add(R.id.fl__overlay_container,
-                                      CollectionFragment.newInstance(),
-                                      CollectionFragment.TAG())
-                                 .addToBackStack(CollectionFragment.TAG())
-                                 .commit();
     }
 
     @Override
     public void closeCollection() {
-        getChildFragmentManager().popBackStackImmediate(CollectionFragment.TAG(),
-                                                        FragmentManager.POP_BACK_STACK_INCLUSIVE);
     }
 
     @Override

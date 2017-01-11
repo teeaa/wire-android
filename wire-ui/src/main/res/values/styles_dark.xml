@@ -301,5 +301,8 @@
         <item name="android:textColor">@color/white</item>
     </style>
 
+    <style name="collection_toolbar__dark" parent="conversation_toolbar__dark">
+        <item name="android:background">@drawable/toolbar_collection_background__dark</item>
+    </style>
 
 </resources>

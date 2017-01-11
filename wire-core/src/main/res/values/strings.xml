@@ -1106,7 +1106,10 @@
     <string name="collection_header_pictures">PICTURES</string>
     <string name="collection_header_files">FILES</string>
     <string name="collection_header_links">LINKS</string>
+    <string name="collection_header_today">TODAY</string>
+    <string name="collection_header_yesterday">YESTERDAY</string>
     <string name="collection_empty">NO ITEMS IN COLLECTION</string>
     <string name="collection_send_to">SEND TO…</string>
+    <string name="collection_all">Show all %1$s</string>
 
 </resources>

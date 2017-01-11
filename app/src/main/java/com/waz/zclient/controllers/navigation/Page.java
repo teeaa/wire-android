@@ -52,4 +52,5 @@ public enum Page {
     DRAWING,
     SHARE_LOCATION,
     MAIN_LANDSCAPE,
+    COLLECTION
 }

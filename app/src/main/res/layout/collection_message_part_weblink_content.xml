@@ -24,67 +24,69 @@
     android:layout_width="match_parent"
     android:layout_height="@dimen/collections__item_view_height"
     android:orientation="vertical"
-    android:padding="@dimen/wire__padding__12"
+    android:padding="@dimen/collections__item_inner_padding"
     android:clipChildren="false"
     android:clipToPadding="false"
     >
 
-    <RelativeLayout
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="@dimen/collections__small_text_line_size"
+        android:clipToPadding="false"
+        android:clipChildren="false"
         >
 
         <com.waz.zclient.ui.text.TypefaceTextView
             android:id="@+id/ttv__collection_item__user_name"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentLeft="true"
-            android:layout_centerVertical="true"
+            android:layout_height="@dimen/collections__small_text_height"
+            android:gravity="bottom"
+            android:layout_gravity="center_vertical|left"
             android:textSize="@dimen/wire__text_size__small"
-            app:font="@string/wire__typeface__regular"
+            app:font="@string/wire__typeface__bold"
             />
 
         <com.waz.zclient.ui.text.TypefaceTextView
             android:id="@+id/ttv__collection_item__time"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentRight="true"
-            android:layout_centerVertical="true"
+            android:layout_height="@dimen/collections__small_text_height"
+            android:gravity="bottom"
+            android:layout_gravity="center_vertical|right"
+            android:textColor="?wireSecondaryTextColor"
             android:textSize="@dimen/wire__text_size__small"
             app:font="@string/wire__typeface__light"
-            android:textColor="?wireSecondaryTextColor"
             />
 
-    </RelativeLayout>
+    </FrameLayout>
 
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="@dimen/collections__web_preview_image_size"
         android:orientation="horizontal"
-        android:layout_marginTop="@dimen/wire__padding__2"
+        android:layout_marginTop="@dimen/wire__padding__8"
         android:clipChildren="false"
-        >
+        android:baselineAligned="false">
 
-        <LinearLayout
+        <RelativeLayout
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
             android:clipChildren="false"
+            android:clipToPadding="false"
             >
 
             <com.waz.zclient.ui.text.TypefaceTextView
                 android:id="@+id/ttv__row_conversation__link_preview__title"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/wire__padding__2"
+                android:layout_alignParentTop="true"
                 android:layout_marginRight="@dimen/wire__padding__8"
                 android:maxLines="1"
                 android:ellipsize="end"
                 android:gravity="left"
                 android:textSize="@dimen/wire__text_size__regular"
-                app:font="@string/wire__typeface__light"
+                app:font="@string/wire__typeface__regular"
                 style="?colorPrimary"
                 />
 
@@ -92,25 +94,32 @@
                 android:id="@+id/ttv__row_conversation__link_preview__url"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/wire__padding__4"
+                android:layout_alignParentBottom="true"
                 android:layout_marginRight="@dimen/wire__padding__8"
                 android:ellipsize="middle"
                 android:maxLines="1"
                 android:gravity="left"
                 android:textSize="@dimen/wire__text_size__small"
                 android:textColor="@color/wire__text_color_secondary_light_selector"
-                app:font="@string/wire__typeface__regular"
+                app:font="@string/wire__typeface__bold"
                 />
 
-        </LinearLayout>
+        </RelativeLayout>
 
-        <ImageView
-            android:id="@+id/iv__row_conversation__link_preview__image"
+        <FrameLayout
+            android:layout_gravity="center_vertical"
             android:layout_width="@dimen/collections__web_preview_image_size"
             android:layout_height="@dimen/collections__web_preview_image_size"
-            android:layout_gravity="center_vertical"
-            />
+            >
+            <ImageView
+                android:id="@+id/iv__row_conversation__link_preview__image"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_gravity="center"
+                android:scaleType="centerCrop"
+                />
+        </FrameLayout>
 
-        </LinearLayout>
+    </LinearLayout>
 
 </LinearLayout>

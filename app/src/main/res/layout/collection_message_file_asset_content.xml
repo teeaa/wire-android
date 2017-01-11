@@ -22,48 +22,56 @@
               xmlns:app="http://schemas.android.com/apk/res-auto"
               android:id="@+id/content"
               android:layout_width="match_parent"
-              android:layout_height="@dimen/collections__item_view_height"
-              android:baselineAligned="false"
-              android:orientation="vertical"
-              android:padding="@dimen/wire__padding__12"
+              android:layout_height="@dimen/collections__medium_item_view_height"
+              android:padding="@dimen/collections__item_inner_padding"
               android:clipToPadding="false"
               android:clipChildren="false"
-    >
+              android:orientation="vertical"
+              >
 
-    <RelativeLayout
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="@dimen/collections__small_text_line_size"
+        android:clipToPadding="false"
+        android:clipChildren="false"
         >
+
         <com.waz.zclient.ui.text.TypefaceTextView
             android:id="@+id/ttv__collection_item__user_name"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentLeft="true"
+            android:layout_height="@dimen/collections__small_text_height"
+            android:gravity="bottom"
+            android:layout_gravity="center_vertical|left"
             android:textSize="@dimen/wire__text_size__small"
-            app:font="@string/wire__typeface__regular"
+            app:font="@string/wire__typeface__bold"
             />
+
         <com.waz.zclient.ui.text.TypefaceTextView
             android:id="@+id/ttv__collection_item__time"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentRight="true"
+            android:layout_height="@dimen/collections__small_text_height"
+            android:gravity="bottom"
+            android:layout_gravity="center_vertical|right"
             android:textColor="?wireSecondaryTextColor"
             android:textSize="@dimen/wire__text_size__small"
             app:font="@string/wire__typeface__light"
             />
-    </RelativeLayout>
+
+    </FrameLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="@dimen/wire__padding__32"
         android:orientation="horizontal"
+        android:clipToPadding="false"
         android:clipChildren="false"
-        android:baselineAligned="false">
+        android:baselineAligned="false"
+        android:layout_marginTop="@dimen/wire__padding__8">
 
         <FrameLayout
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
+            android:clipToPadding="false"
             android:clipChildren="false"
             >
 
@@ -111,7 +119,7 @@
                 android:layout_height="wrap_content"
                 android:ellipsize="middle"
                 android:maxLines="1"
-                app:font="@string/wire__typeface__light"
+                app:font="@string/wire__typeface__bold"
                 />
 
             <com.waz.zclient.ui.text.TypefaceTextView

@@ -99,6 +99,9 @@
     <color name="ephemera">#FFFF5000</color>
     <color name="ephemera_dimmed">#3DFF5000</color>
 
+    <color name="collection_background_light">#fafafa</color>
+    <color name="collection_background_dark">@color/background_graphite</color>
+
     <!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
     <!-- Component colors  -->
     <!--

@@ -213,7 +213,9 @@
     <issue id="TypographyQuotes" severity="error" />
     <issue id="UseCompoundDrawables" severity="error" />
     <issue id="UselessLeaf" severity="error" />
-    <issue id="UselessParent" severity="error" />
+    <issue id="UselessParent" severity="error" >
+        <ignore path="src/main/res/layout/row_collection_header.xml"/>
+    </issue>
     <issue id="UnusedResources" severity="error" />
     <issue id="UnusedIds" severity="error" />
     <issue id="UnusedResources" severity="error">
@@ -226,6 +228,7 @@
         <ignore path="src/main/res/layout/row_selectable_conversation.xml"/>
         <ignore path="src/main/res/layout/system_message_content.xml"/>
         <ignore path="*pin_bg.xml*"/>
+        <ignore path="src/main/res/menu/toolbar_collection.xml"/>
 
         <!--TODO Dean - leaving these here as design comes up with a new container-->
         <ignore path="*ic_action_soundcloud*"/>
