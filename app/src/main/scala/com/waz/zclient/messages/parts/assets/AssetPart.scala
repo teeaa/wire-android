@@ -43,13 +43,16 @@ import org.threeten.bp.Duration
 trait AssetPart extends View with ClickableViewPart with ViewHelper { self =>
   val controller = inject[AssetsController]
 
-  inflate(self match {
-    case _: AudioAssetPartView => R.layout.message_audio_asset_content
-    case _: FileAssetPartView  => R.layout.message_file_asset_content
-    case _: ImagePartView      => R.layout.message_image_content
-    case _: VideoAssetPartView => R.layout.message_video_asset_content
+  def layoutList: PartialFunction[AssetPart, Int] = {
+      case _: AudioAssetPartView => R.layout.message_audio_asset_content
+      case _: FileAssetPartView  => R.layout.message_file_asset_content
+      case _: ImagePartView      => R.layout.message_image_content
+      case _: VideoAssetPartView => R.layout.message_video_asset_content
+  }
+
+  inflate(layoutList.orElse[AssetPart, Int]{
     case _ => throw new Exception("Unexpected AssetPart view type - ensure you define the content layout and an id for the content for the part")
-  })
+  }(self))
 
   val asset = controller.assetSignal(message)
   val deliveryState = DeliveryState(message, asset)
