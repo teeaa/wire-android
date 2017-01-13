@@ -29,35 +29,7 @@
               android:orientation="vertical"
               >
 
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="@dimen/collections__small_text_line_size"
-        android:clipToPadding="false"
-        android:clipChildren="false"
-        >
-
-        <com.waz.zclient.ui.text.TypefaceTextView
-            android:id="@+id/ttv__collection_item__user_name"
-            android:layout_width="wrap_content"
-            android:layout_height="@dimen/collections__small_text_height"
-            android:gravity="bottom"
-            android:layout_gravity="center_vertical|left"
-            android:textSize="@dimen/wire__text_size__small"
-            app:font="@string/wire__typeface__bold"
-            />
-
-        <com.waz.zclient.ui.text.TypefaceTextView
-            android:id="@+id/ttv__collection_item__time"
-            android:layout_width="wrap_content"
-            android:layout_height="@dimen/collections__small_text_height"
-            android:gravity="bottom"
-            android:layout_gravity="center_vertical|right"
-            android:textColor="?wireSecondaryTextColor"
-            android:textSize="@dimen/wire__text_size__small"
-            app:font="@string/wire__typeface__light"
-            />
-
-    </FrameLayout>
+    <include layout="@layout/collection_item_metadata"/>
 
     <LinearLayout
         android:layout_width="match_parent"

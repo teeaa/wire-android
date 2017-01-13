@@ -63,7 +63,7 @@ import org.threeten.bp.temporal.ChronoUnit
 import com.waz.zclient.utils.ContextUtils._
 
 //For now just handling images
-class CollectionAdapter(viewDim: Signal[Dim2], columns: Int, ctrler: ICollectionsController)(implicit context: Context, injector: Injector, eventContext: EventContext) extends RecyclerView.Adapter[ViewHolder] with Injectable { adapter =>
+class CollectionAdapter(viewDim: Signal[Dim2], ctrler: ICollectionsController)(implicit context: Context, injector: Injector, eventContext: EventContext) extends RecyclerView.Adapter[ViewHolder] with Injectable { adapter =>
 
   private implicit val tag: LogTag = logTagFor[CollectionAdapter]
 
@@ -143,7 +143,7 @@ class CollectionAdapter(viewDim: Signal[Dim2], columns: Int, ctrler: ICollection
     getItem(position).foreach{ md =>
       holder match {
         case f: FileViewHolder => f.setMessageData(md)
-        case c: CollectionImageViewHolder => c.setMessageData(md, viewDim.currentValue.fold(0)(_.width) / columns, ResourceUtils.getRandomAccentColor(context))
+        case c: CollectionImageViewHolder => c.setMessageData(md, viewDim.currentValue.fold(0)(_.width) / CollectionController.GridColumns, ResourceUtils.getRandomAccentColor(context))
         case l: LinkPreviewViewHolder => l.setMessageData(md)
         case l: SimpleLinkViewHolder => l.setMessageData(md)
       }

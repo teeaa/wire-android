@@ -122,6 +122,8 @@ class StubCollectionController extends ICollectionsController{
 
 object CollectionController {
 
+  val GridColumns = 4
+
   trait ContentType {
     val msgTypes: Seq[Message.Type]
     val typeFilter: Seq[TypeFilter]

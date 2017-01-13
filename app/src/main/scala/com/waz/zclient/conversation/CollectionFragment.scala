@@ -94,8 +94,7 @@ class CollectionFragment extends BaseFragment[CollectionFragment.Container] with
       case _ => closeSingleImage()
     }
 
-    val columns = 4
-    adapter = new CollectionAdapter(recyclerView.viewDim, columns, controller)
+    adapter = new CollectionAdapter(recyclerView.viewDim, controller)
     recyclerView.init(adapter)
 
     def setNavigationIconVisibility(visible: Boolean) = {

@@ -122,7 +122,7 @@ class CollectionFileAssetPartView(context: Context, attrs: AttributeSet, style: 
   override lazy val contentLayoutId = R.layout.collection_message_file_asset_content
 }
 
-class CollectionSimpleWebLinkPartView(context: Context, attrs: AttributeSet, style: Int) extends CardView(context: Context, attrs: AttributeSet, style: Int) with CollectionNormalItemView with ClickableViewPart{
+class CollectionSimpleWebLinkPartView(context: Context, attrs: AttributeSet, style: Int) extends CardView(context: Context, attrs: AttributeSet, style: Int) with CollectionNormalItemView{
   def this(context: Context, attrs: AttributeSet) = this(context, attrs, 0)
   def this(context: Context) = this(context, null, 0)
 
@@ -141,7 +141,7 @@ class CollectionSimpleWebLinkPartView(context: Context, attrs: AttributeSet, sty
 
   urlText.on(Threading.Ui){ urlTextView.setText}
 
-  onClicked { _ =>
+  this.onClick {
     urlText.currentValue foreach { c => browser.openUrl(Uri.parse(c)) }
   }
 

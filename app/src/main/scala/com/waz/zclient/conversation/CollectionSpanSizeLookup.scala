@@ -17,7 +17,9 @@
  */
 package com.waz.zclient.conversation
 
-import android.support.v7.widget.GridLayoutManager
+import android.annotation.TargetApi
+import android.os.Build
+import android.support.v7.widget.{GridLayoutManager, RecyclerView}
 import android.util.SparseArray
 import com.waz.ZLog._
 import com.waz.utils.events.EventContext
@@ -30,7 +32,22 @@ class CollectionSpanSizeLookup(val spanCount: Int, val adapter: CollectionAdapte
   private val spanIndexCache = new SparseArray[Int]()
   private val spanSizeCache = new SparseArray[Int]()
 
-  adapter.contentMode(_ => clearCache())
+  adapter.registerAdapterDataObserver(new RecyclerView.AdapterDataObserver() {
+    override def onChanged(): Unit = clearCache()
+
+    override def onItemRangeRemoved(positionStart: Int, itemCount: Int): Unit = clearCacheFromPosition(positionStart - 1)
+
+    override def onItemRangeMoved(fromPosition: Int, toPosition: Int, itemCount: Int): Unit = {
+      val minPos = Math.min(fromPosition, toPosition)
+      clearCacheFromPosition(minPos - 1)
+    }
+
+    override def onItemRangeChanged(positionStart: Int, itemCount: Int): Unit = clearCacheFromPosition(positionStart - 1)
+
+    override def onItemRangeChanged(positionStart: Int, itemCount: Int, payload: scala.Any): Unit = clearCacheFromPosition(positionStart - 1)
+
+    override def onItemRangeInserted(positionStart: Int, itemCount: Int): Unit = clearCacheFromPosition(positionStart - 1)
+  })
 
   override def getSpanSize(position: Int): Int = {
     if (spanSizeIsCached(position)) {
@@ -113,5 +130,19 @@ class CollectionSpanSizeLookup(val spanCount: Int, val adapter: CollectionAdapte
   def clearCache(): Unit ={
     spanIndexCache.clear()
     spanSizeCache.clear()
+  }
+
+  @TargetApi(Build.VERSION_CODES.KITKAT)
+  def clearCacheFromPosition(position: Int): Unit = {
+    if (position <= 0 || Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
+      clearCache()
+      return
+    }
+    if (position <= spanIndexCache.size() - 1) {
+      spanIndexCache.removeAtRange(position, spanIndexCache.size() - position)
+    }
+    if (position <= spanSizeCache.size() - 1) {
+      spanSizeCache.removeAtRange(position, spanSizeCache.size() - position)
+    }
   }
 }

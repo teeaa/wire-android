@@ -38,18 +38,18 @@ class CollectionRecyclerView(context: Context, attrs: AttributeSet, style: Int) 
   import CollectionRecyclerView._
 
   val viewDim = Signal[Dim2]()
-  val layoutManager = new GridLayoutManager(context, columns, LinearLayoutManager.VERTICAL, false) {
+  val layoutManager = new GridLayoutManager(context, CollectionController.GridColumns, LinearLayoutManager.VERTICAL, false) {
     override def supportsPredictiveItemAnimations(): Boolean = true
   }
   var collectionItemDecorator: CollectionItemDecorator = null
 
   def init(adapter: CollectionAdapter): Unit = {
     val scrollController = new CollectionScrollController(adapter, viewDim.map(_.height))
-    collectionItemDecorator = new CollectionItemDecorator(adapter, columns)
+    collectionItemDecorator = new CollectionItemDecorator(adapter, CollectionController.GridColumns)
 
     setAdapter(adapter)
 
-    layoutManager.setSpanSizeLookup(new CollectionSpanSizeLookup(columns, adapter))
+    layoutManager.setSpanSizeLookup(new CollectionSpanSizeLookup(CollectionController.GridColumns, adapter))
     setLayoutManager(layoutManager)
 
     addItemDecoration(collectionItemDecorator)
@@ -138,5 +138,4 @@ class CollectionRecyclerView(context: Context, attrs: AttributeSet, style: Int) 
 object CollectionRecyclerView {
 
   val MaxSmoothScroll = 50
-  val columns = 4
 }

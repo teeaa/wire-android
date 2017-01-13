@@ -91,8 +91,6 @@ public class MessageBottomSheetDialog extends BottomSheetDialog {
         }
         if (isForwardAllowed()) {
             addAction(view, MessageAction.FORWARD);
-        }
-        if (isMultipleForwardAllowed()) {
             addAction(view, MessageAction.FORWARD_MULTIPLE);
         }
         addAction(view, MessageAction.DELETE_LOCAL);
@@ -232,10 +230,6 @@ public class MessageBottomSheetDialog extends BottomSheetDialog {
             default:
                 return false;
         }
-    }
-
-    private boolean isMultipleForwardAllowed() {
-        return isForwardAllowed();
     }
 
     private boolean isEditAllowed(boolean isMemberOfConversation) {

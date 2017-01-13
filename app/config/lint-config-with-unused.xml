@@ -142,7 +142,9 @@
     <issue id="WrongManifestParent" severity="error" />
     <issue id="ManifestTypo" severity="error" />
     <issue id="FloatMath" severity="error" />
-    <issue id="MergeRootFrame" severity="error" />
+    <issue id="MergeRootFrame" severity="error">
+        <ignore path="src/main/res/layout/collection_item_metadata.xml"/>
+    </issue>
     <issue id="InnerclassSeparator" severity="error" />
     <issue id="Instantiatable" severity="error" />
     <issue id="MissingRegistered" severity="error" />
