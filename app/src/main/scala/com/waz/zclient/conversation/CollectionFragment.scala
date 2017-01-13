@@ -129,8 +129,8 @@ class CollectionFragment extends BaseFragment[CollectionFragment.Container] with
       case _ =>
     }
 
-    adapter.contentMode.on(Threading.Ui){
-      _ => recyclerView.smoothScrollToPosition(0)
+    adapter.contentMode.on(Threading.Ui){ _ =>
+      recyclerView.scrollToPosition(0)
     }
 
     toolbar.inflateMenu(R.menu.toolbar_collection)
@@ -155,6 +155,11 @@ class CollectionFragment extends BaseFragment[CollectionFragment.Container] with
   }
 
   override def onBackPressed(): Boolean = {
+    val recyclerView: Option[CollectionRecyclerView] = Option(findById(R.id.rv__collection))
+    recyclerView.foreach{ rv =>
+      rv.stopScroll()
+      rv.getSpanSizeLookup().clearCache()
+    }
     getChildFragmentManager.findFragmentByTag(SingleImageCollectionFragment.TAG) match {
       case fragment: SingleImageCollectionFragment => controller.focusedItem ! None; return true
       case _ =>
