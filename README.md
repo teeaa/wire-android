@@ -44,3 +44,7 @@ These steps will build only the Wire client UI, pulling in all other Wire framew
 
 ## Android Studio
 When importing project in Android Studio **do not allow** gradle plugin update. Our build setup requires Android Plugin for Gradle version 1.5. 
+
+### Translations
+
+All Wire translations are crowdsourced via CrowdIn: https://crowdin.com/projects/wire
