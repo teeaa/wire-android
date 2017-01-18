@@ -33,6 +33,7 @@ import com.waz.service.messages.MessageAndLikes
 import com.waz.threading.Threading
 import com.waz.utils.events.{EventContext, Signal, SourceSignal}
 import com.waz.zclient.controllers.BrowserController
+import com.waz.zclient.conversation.CollectionController
 import com.waz.zclient.messages.MessageView.MsgBindOptions
 import com.waz.zclient.messages.controllers.MessageActionsController
 import com.waz.zclient.messages.parts.WebLinkPartView
@@ -48,6 +49,8 @@ import org.threeten.bp.{LocalDateTime, ZoneId}
 trait CollectionItemView extends ViewHelper {
   protected lazy val civZms = inject[Signal[ZMessaging]]
   protected lazy val messageActions = inject[MessageActionsController]
+  protected lazy val collectionController = inject[CollectionController]
+
   val messageData: SourceSignal[MessageData] = Signal()
 
   val messageAndLikesResolver = civZms.zip(messageData).flatMap{
@@ -57,6 +60,7 @@ trait CollectionItemView extends ViewHelper {
   messageAndLikesResolver.disableAutowiring()
 
   this.onLongClick {
+    messageData.currentValue.foreach(collectionController.openContextMenuForMessage ! _)
     performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
     messageAndLikesResolver.currentValue.exists(messageActions.showDialog)
   }
@@ -151,6 +155,7 @@ class CollectionSimpleWebLinkPartView(context: Context, attrs: AttributeSet, sty
   urlText.on(Threading.Ui){ urlTextView.setText}
 
   this.onClick {
+    messageData.currentValue.foreach(collectionController.clickedMessage ! _)
     urlText.currentValue foreach { c => browser.openUrl(Uri.parse(c)) }
   }
 

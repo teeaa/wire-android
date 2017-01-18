@@ -25,8 +25,9 @@ import com.waz.api.{IConversation, Message, TypeFilter}
 import com.waz.model._
 import com.waz.service.ZMessaging
 import com.waz.threading.SerialDispatchQueue
-import com.waz.utils.events.{Signal, SourceSignal}
+import com.waz.utils.events.{EventStream, Signal, SourceSignal}
 import com.waz.zclient.controllers.collections.CollectionsObserver
+import com.waz.zclient.conversation.CollectionController.CollectionInfo
 import com.waz.zclient.{Injectable, Injector}
 
 trait ICollectionsController {
@@ -69,6 +70,12 @@ class CollectionController(implicit injector: Injector) extends Injectable with 
 
   val conversation = zms.zip(currentConv) flatMap { case (zms, convId) => zms.convsStorage.signal(convId) }
 
+  val openedCollection = Signal[Option[CollectionInfo]]()
+
+  val openContextMenuForMessage = EventStream[MessageData]()
+
+  val clickedMessage = EventStream[MessageData]()
+
   override val conversationName = conversation map (data => if (data.convType == IConversation.Type.GROUP) data.name.filter(!_.isEmpty).getOrElse(data.generatedName) else data.generatedName)
 
   override val focusedItem: SourceSignal[Option[MessageData]] = Signal(None)
@@ -81,9 +88,9 @@ class CollectionController(implicit injector: Injector) extends Injectable with 
     }
   }
 
-  override def openCollection = performOnObservers(_.openCollection())
+  override def openCollection() = performOnObservers(_.openCollection())
 
-  override def closeCollection = performOnObservers(_.closeCollection())
+  override def closeCollection() = { performOnObservers(_.closeCollection()); openedCollection ! None }
 
   override def requestPreviousItem(): Unit = performOnObservers(_.previousItemRequested())
 
@@ -123,6 +130,12 @@ class StubCollectionController extends ICollectionsController{
 object CollectionController {
 
   val GridColumns = 4
+
+  case class CollectionInfo(conversation: ConversationData, empty: Boolean)
+
+  def injectedCollectionController(injectable: Injectable)(implicit injector: Injector): CollectionController =  {
+    injectable.inject[CollectionController]
+  }
 
   trait ContentType {
     val msgTypes: Seq[Message.Type]

@@ -112,3 +112,39 @@ case class PlayedAudioMessageEvent(fileMimeType: String, durationSec: Int, playe
 
 case class PlayedYouTubeMessageEvent(playedByReceiver: Boolean, isOtto: Boolean, convType: ConversationType)
   extends MessageEvent("media.played_youtube_message", playedByReceiver, isOtto, convType)
+
+abstract class CollectionsEvent(name: String, conversationType: ConversationType, withBot: Boolean) extends Event("collections." + name){
+  protected val baseAttributes = Map(
+    WITH_BOT          -> String.valueOf(withBot),
+    CONVERSATION_TYPE -> conversationType.name
+  )
+}
+case class OpenedCollectionsEvent(isEmpty: Boolean, conversationType: ConversationType, withBot: Boolean) extends CollectionsEvent("opened_collections", conversationType, withBot){
+  override val attributes = baseAttributes ++ Map(
+    IS_EMPTY -> String.valueOf(isEmpty)
+  )
+}
+case class OpenedItemCollectionsEvent(messageType: String, conversationType: ConversationType, withBot: Boolean) extends CollectionsEvent("opened_item", conversationType, withBot){
+  override val attributes = baseAttributes ++ Map(
+    TYPE -> messageType
+  )
+}
+case class OpenedItemMenuCollectionsEvent(messageType: String, conversationType: ConversationType, withBot: Boolean) extends CollectionsEvent("opened_item_menu", conversationType, withBot){
+  override val attributes = baseAttributes ++ Map(
+    TYPE -> messageType
+  )
+}
+case class DidItemActionCollectionsEvent(messageAction: MessageAction, messageType: String, conversationType: ConversationType, withBot: Boolean) extends CollectionsEvent("did_item_action", conversationType, withBot){
+  import MessageAction._
+  override val attributes = baseAttributes ++ Map(
+    TYPE   -> messageType,
+    ACTION -> (messageAction match {
+      case DELETE_GLOBAL => "delete_for_everyone"
+      case DELETE_LOCAL  => "delete_for_me"
+      case COPY          => "copy"
+      case EDIT          => "edit"
+      case FORWARD       => "forward"
+      case _             => "other"
+    })
+  )
+}

@@ -21,6 +21,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.view.View;
 
+import com.waz.zclient.Injectable;
 import com.waz.zclient.WireContext;
 import com.waz.zclient.controllers.accentcolor.AccentColorController;
 import com.waz.zclient.controllers.accentcolor.IAccentColorController;
@@ -163,6 +164,7 @@ public abstract class Base$$ControllerFactory implements IControllerFactory {
   protected boolean isTornDown;
 
   protected Context context;
+  protected Activity activity;
 
   public Base$$ControllerFactory(Context context) {
     this.context = context;
@@ -550,6 +552,7 @@ public abstract class Base$$ControllerFactory implements IControllerFactory {
 
   @Override
   public void setActivity(Activity activity) {
+    this.activity = activity;
     getGlobalLayoutController().setActivity(activity);
     getOrientationController().setActivity(activity);
     getSpotifyController().setActivity(activity);
@@ -633,7 +636,7 @@ public abstract class Base$$ControllerFactory implements IControllerFactory {
     public ICollectionsController getCollectionsController() {
         verifyLifecycle();
         if (collectionsController == null) {
-            collectionsController = new CollectionController(((WireContext) this.context).injector());
+            collectionsController = CollectionController.injectedCollectionController(((Injectable) activity), ((WireContext) activity).injector());
         }
         return collectionsController;
     }

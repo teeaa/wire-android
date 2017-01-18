@@ -63,7 +63,7 @@ import org.threeten.bp.temporal.ChronoUnit
 import com.waz.zclient.utils.ContextUtils._
 
 //For now just handling images
-class CollectionAdapter(viewDim: Signal[Dim2], ctrler: ICollectionsController)(implicit context: Context, injector: Injector, eventContext: EventContext) extends RecyclerView.Adapter[ViewHolder] with Injectable { adapter =>
+class CollectionAdapter(viewDim: Signal[Dim2], ctrler: CollectionController)(implicit context: Context, injector: Injector, eventContext: EventContext) extends RecyclerView.Adapter[ViewHolder] with Injectable { adapter =>
 
   private implicit val tag: LogTag = logTagFor[CollectionAdapter]
 
@@ -81,6 +81,12 @@ class CollectionAdapter(viewDim: Signal[Dim2], ctrler: ICollectionsController)(i
   var header: CollectionHeaderLinearLayout = null
 
   val adapterState = Signal[AdapterState](AdapterState(contentMode.currentValue.get, 0, loading = true))
+
+  Signal(conv, adapterState).on(Threading.Ui){
+    case (Some(c), AdapterState(AllContent, 0, false)) => ctrler.openedCollection ! Some(CollectionInfo(c, empty = true))
+    case (Some(c), AdapterState(AllContent, count, false)) => ctrler.openedCollection ! Some(CollectionInfo(c, empty = false))
+    case _ =>
+  }
 
   val collectionCursors = scala.collection.mutable.Map[ContentType, Option[RecyclerCursor]](
     AllContent -> None,

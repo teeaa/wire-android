@@ -108,7 +108,9 @@ public enum Attribute {
     GCM_RE_REGISTER("registration_retries"),
     TOTAL_PINGS("total_pings"),
     RECEIVED_PONGS("received_pongs"),
-    PING_INTERVAL("ping_interval")
+    PING_INTERVAL("ping_interval"),
+
+    IS_EMPTY("is_empty")
 
     ;
 

@@ -33,6 +33,7 @@ import com.waz.zclient.controllers.singleimage.ISingleImageController
 import com.waz.zclient.controllers.theme.IThemeController
 import com.waz.zclient.controllers.tracking.ITrackingController
 import com.waz.zclient.controllers.userpreferences.IUserPreferencesController
+import com.waz.zclient.conversation.CollectionController
 import com.waz.zclient.core.stores.IStoreFactory
 import com.waz.zclient.messages.controllers.{MessageActionsController, NavigationController}
 import com.waz.zclient.messages.{LikesController, MessageViewFactory, MessagesController, UsersController}
@@ -110,6 +111,7 @@ object WireApplication {
     bind [MessageActionsController]  to new MessageActionsController()
     bind [MessagesController]        to new MessagesController()
     bind [LikesController]           to new LikesController()
+    bind [CollectionController]      to new CollectionController()
     bind [TrackingController]        to new TrackingController()
   }
 }

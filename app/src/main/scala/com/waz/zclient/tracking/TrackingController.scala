@@ -22,7 +22,7 @@ import java.util
 import android.content.Context
 import com.waz.api.Message
 import com.waz.model.ConversationData.ConversationType
-import com.waz.model.{AssetData, MessageId}
+import com.waz.model.{AssetData, ConvId, ConversationData, MessageId}
 import com.waz.service.ZMessaging
 import com.waz.service.tracking.TrackingEventsService
 import com.waz.threading.Threading
@@ -30,6 +30,7 @@ import com.waz.utils.events.{EventContext, Signal}
 import com.waz.utils.returning
 import com.waz.zclient.controllers.tracking.ITrackingController
 import com.waz.zclient.controllers.{AssetsController, BrowserController}
+import com.waz.zclient.conversation.CollectionController
 import com.waz.zclient.core.controllers.tracking.attributes.{Attribute, RangedAttribute}
 import com.waz.zclient.messages.LikesController
 import com.waz.zclient.messages.controllers.MessageActionsController
@@ -50,12 +51,19 @@ class TrackingController(implicit injector: Injector, ctx: Context, ec: EventCon
   val controller = inject[ITrackingController]
   import controller._
 
-  val msgActionController = inject[MessageActionsController]
-  val assetsController    = inject[AssetsController]
-  val browserController   = inject[BrowserController]
-  val likesController     = inject[LikesController]
+  val msgActionController   = inject[MessageActionsController]
+  val assetsController      = inject[AssetsController]
+  val browserController     = inject[BrowserController]
+  val likesController       = inject[LikesController]
+  val collectionsController = inject[CollectionController]
 
   msgActionController.onMessageAction {
+    case (action, message) if collectionsController.openedCollection.currentValue.exists(_.nonEmpty) =>
+      collectionsController.openedCollection.currentValue.foreach(_.foreach{ info=>
+        trackingData(info.conversation.id).map{ data =>
+          tagEvent(DidItemActionCollectionsEvent(action, message.getMessageType.name(), data.convType, data.withOtto))
+        }
+      })
     case (action, message) => tagEvent(OpenedMessageActionEvent(action, message.getMessageType.name))
 
       import MessageAction._
@@ -97,6 +105,24 @@ class TrackingController(implicit injector: Injector, ctx: Context, ec: EventCon
     case MessageTrackingData(convType, _, isOtto, fromSelf, _) => tagEvent(PlayedYouTubeMessageEvent(!fromSelf, isOtto, convType))
   })
 
+  collectionsController.openedCollection.on(Threading.Ui){
+    _.foreach{info => trackingData(info.conversation.id).map { data =>
+      tagEvent(OpenedCollectionsEvent(info.empty, data.convType, data.withOtto))}
+    }
+  }
+
+  collectionsController.openContextMenuForMessage{
+    m => trackingData(m.id).map{ data =>
+      tagEvent(OpenedItemMenuCollectionsEvent(m.msgType.name(), data.convType, data.withOtto))
+    }
+  }
+
+  collectionsController.clickedMessage{
+    m => trackingData(m.id).map{ data =>
+      tagEvent(OpenedItemMenuCollectionsEvent(m.msgType.name(), data.convType, data.withOtto))
+    }
+  }
+
   private def durationInSeconds(a: AssetData): Int = (a match {
     case AssetData.WithDuration(d) => d
     case _ => Duration.ZERO
@@ -114,11 +140,21 @@ class TrackingController(implicit injector: Injector, ctx: Context, ec: EventCon
       isLastMsg   = lastMsgs._1.exists(_.id == msg.id) || lastMsgs._2.exists(_.id == msg.id)
     } yield MessageTrackingData(convType, msg.msgType, withOtto, fromSelf, isLastMsg)
   }
+
+  private def trackingData(convId: ConvId): Future[ConversationTrackingData] = {
+    for {
+      zms        <- zMessaging.head
+      Some(conv) <- zms.convsContent.convById(convId)
+      withOtto   <- TrackingEventsService.isOtto(conv, zms.usersStorage)
+    } yield ConversationTrackingData(conv.convType, withOtto)
+  }
 }
 
 object TrackingController {
 
   case class MessageTrackingData(convType: ConversationType, msgType: Message.Type, withOtto: Boolean, msgFromSelf: Boolean, isLastMsg: Boolean)
+
+  case class ConversationTrackingData(convType: ConversationType, withOtto: Boolean)
 
   //implicit converter from Scala tracking event to Java tracking event for compatibility with older tracking code
   implicit def toJava(event: Event): com.waz.zclient.core.controllers.tracking.events.Event = new com.waz.zclient.core.controllers.tracking.events.Event {
